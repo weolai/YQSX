@@ -1,0 +1,52 @@
+server:
+  port: 8080
+spring:
+  cloud:
+    sentinel:
+      transport:
+        port: 8721
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        - id: shop-user-service
+          uri: lb://shop-user-service
+          predicates:
+            - Path=/api/user/**
+          filters:
+            - StripPrefix=1
+        - id: shop-product-service
+          uri: lb://shop-product-service
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - StripPrefix=1
+        - id: shop-order-service
+          uri: lb://shop-order-service
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - StripPrefix=1
+        - id: shop-payment-service
+          uri: lb://shop-payment-service
+          predicates:
+            - Path=/api/payment/**
+          filters:
+            - StripPrefix=1
+        - id: time-demo
+          uri: lb://shop-user-service
+          predicates:
+            - Path=/api/time/**
+          filters:
+            - RewritePath=/api/time/(?<segment>.*), /user/$\{segment}
+            - RequestTime=true
+        - id: demo-rewrite
+          uri: lb://shop-product-service
+          predicates:
+            - Path=/api/demo/**
+          filters:
+            - RewritePath=/api/demo/(?<segment>.*), /products/$\{segment}
+gateway:
+  auth:
+    whitelist: /api/user/login,/api/user/hello,/api/time/**,/api/discovery/**,/api/demo/**

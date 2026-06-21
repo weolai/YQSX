@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: shop-product-service
+  cloud:
+    nacos:
+      config:
+        server-addr: localhost:8848
+        file-extension: yaml
+        shared-configs:
+          - data-id: global-config.yaml
+            refresh: true

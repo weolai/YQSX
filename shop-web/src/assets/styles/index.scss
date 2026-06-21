@@ -1,0 +1,168 @@
+@import './variables.scss';
+
+// 全局样式重置
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  font-family: $font-family;
+  font-size: $font-size-base;
+  color: $text-primary;
+  background-color: $bg-secondary;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: $bg-tertiary;
+  border-radius: $radius-base;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $text-tertiary;
+  border-radius: $radius-base;
+  
+  &:hover {
+    background: $text-secondary;
+  }
+}
+
+// 通用工具类
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.text-center {
+  text-align: center;
+}
+
+// 页面过渡动画
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all $duration-base $easing-ease-in-out;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+// 按钮悬浮效果
+.btn-hover {
+  transition: all $duration-base $easing-ease-in-out;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-lg;
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+// 卡片悬浮效果
+.card-hover {
+  transition: all $duration-base $easing-ease-in-out;
+  
+  &:hover {
+    transform: translateY(-8px);
+    box-shadow: $shadow-xl;
+  }
+}
+
+// 玻璃态卡片
+.glass-card {
+  background: $glass-bg;
+  backdrop-filter: blur(10px);
+  border: 1px solid $glass-border;
+  border-radius: $radius-lg;
+  box-shadow: $glass-shadow;
+}
+
+// 渐变文字
+.gradient-text {
+  background: $primary-gradient;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+// 加载动画
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+// 淡入动画
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn $duration-base $easing-ease-out;
+}
+
+// 缩放动画
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.scale-in {
+  animation: scaleIn $duration-base $easing-ease-out;
+}

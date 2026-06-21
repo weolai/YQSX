@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: shop-payment-service
+  cloud:
+    nacos:
+      config:
+        enabled: false
+      discovery:
+        enabled: false

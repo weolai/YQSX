@@ -1,0 +1,1 @@
+ALTER TABLE `shop-order`.t_order MODIFY COLUMN status VARCHAR(20) DEFAULT 'WAIT_PAY';
