@@ -12,8 +12,8 @@
         <div class="user-info">
           <el-dropdown trigger="click" @command="handleCommand">
             <span class="user-dropdown">
-              <span class="user-avatar">{{ authStore.username?.charAt(0).toUpperCase() }}</span>
-              <span class="user-name">{{ authStore.username }}</span>
+              <span class="user-avatar">{{ authStore.username ? authStore.username.charAt(0).toUpperCase() : 'U' }}</span>
+              <span class="user-name">{{ authStore.username || '用户' }}</span>
               <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>

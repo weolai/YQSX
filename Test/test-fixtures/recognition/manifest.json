@@ -1,0 +1,36 @@
+{
+  "sample_multi_snacks.jpg": {
+    "description": "多零食组合图，含4个检测目标",
+    "source": "dataset/valid/images/20250506_213503_mp4-0052_jpg.rf.4b73465fd743993dc3cb2c757bf385fd.jpg",
+    "expectedDetections": 4,
+    "expectedResults": [
+      {
+        "productClassId": 10,
+        "productClassName": "Cheetoz 车轮零食",
+        "minConfidence": 0.95
+      },
+      {
+        "productClassId": 15,
+        "productClassName": "Mini Lina 饼干",
+        "minConfidence": 0.95
+      },
+      {
+        "productClassId": 12,
+        "productClassName": "Maz Maz 土豆条",
+        "minConfidence": 0.95
+      },
+      {
+        "productClassId": 15,
+        "productClassName": "Mini Lina 饼干",
+        "minConfidence": 0.95
+      }
+    ],
+    "expectedProduct": {
+      "id": 11,
+      "name": "Cheetoz 车轮零食",
+      "categoryId": 11
+    },
+    "testedAt": "2026-06-22",
+    "apiEndpoint": "POST /api/products/recognize"
+  }
+}

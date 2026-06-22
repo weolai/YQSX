@@ -50,6 +50,10 @@ request.interceptors.response.use(
           console.error('服务暂时不可用，请稍后再试')
           break
         default:
+          if (!error.response) {
+            console.error('无法连接到服务网关，请确认 Gateway 已启动')
+            break
+          }
           const data = error.response?.data as { msg?: string; message?: string } | undefined
           const errorMsg = data?.msg || data?.message || '请求失败'
           console.error(errorMsg)
