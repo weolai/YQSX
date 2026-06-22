@@ -30,6 +30,13 @@
 - [frontend-backend-integration.md](frontend-backend-integration.md) - 前后端对接文档
 - [ai-integration.md](ai-integration.md) - 模型层与应用层对接文档
 
+### 7. 前端开发指南 ⭐ 新增
+- [frontend-design-plan.md](frontend-design-plan.md) - 前端界面设计方案（8个核心页面）
+- [frontend-quickstart.md](frontend-quickstart.md) - 前端快速启动指南（完整代码示例）
+- [implementation-guide.md](implementation-guide.md) - ⭐ **前端实施指南（推荐优先阅读）**
+- [product-images-solution.md](product-images-solution.md) - 商品图片解决方案
+- [quick-reference.md](quick-reference.md) - 快速参考手册（常用命令速查）
+
 ---
 
 ## 📂 完整知识库结构
@@ -215,6 +222,11 @@ docs/
 | project-status.md | ✅ 已更新 | 2026-06-20 | AI Assistant |
 | frontend-backend-integration.md | ✅ 已新增 | 2026-06-20 | AI Assistant |
 | ai-integration.md | ✅ 已新增 | 2026-06-20 | AI Assistant |
+| **frontend-design-plan.md** | ✅ **已新增** | **2026-06-22** | AI Assistant |
+| **frontend-quickstart.md** | ✅ **已新增** | **2026-06-22** | AI Assistant |
+| **implementation-guide.md** | ✅ **已新增** | **2026-06-22** | AI Assistant |
+| **product-images-solution.md** | ✅ **已新增** | **2026-06-22** | AI Assistant |
+| **quick-reference.md** | ✅ **已新增** | **2026-06-22** | AI Assistant |
 | project-status.md | ✅ 已更新(v1.2.0) | 2026-06-20 | AI Assistant |
 
 ---
@@ -280,6 +292,7 @@ docs/
 - **性能优化**: performance.md, optimization.md
 - **故障排查**: troubleshooting.md, common-issues.md
 - **安全加固**: security-best-practices.md, data-encryption.md
+- **前端项目启动**: implementation-guide.md ⭐, frontend-quickstart.md, quick-reference.md
 
 ---
 
@@ -346,9 +359,10 @@ docs/
 | 1.0.0 | 2026-06-18 | 初始版本，完成核心文档 | AI Assistant |
 | 1.1.0 | 2026-06-20 | 更新项目状态、API 接口清单、新增前后端对接与 AI 集成文档 | AI Assistant |
 | 1.2.0 | 2026-06-20 | 更新前端完成状态、订单列表接口、识别中文映射、DTO 补全、订单状态默认值修复 | AI Assistant |
+| 1.3.0 | 2026-06-22 | **新增前端完整开发文档**：设计方案、快速启动、实施指南、图片方案、快速参考 | AI Assistant |
 
 ---
 
-**最后更新**: 2026-06-20  
+**最后更新**: 2026-06-22  
 **维护者**: AI Assistant  
 **联系方式**: dev@example.com

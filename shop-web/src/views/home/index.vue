@@ -10,8 +10,29 @@
           <router-link to="/orders" class="nav-item">我的订单</router-link>
         </nav>
         <div class="user-info">
-          <span>{{ authStore.username }}</span>
-          <el-button text @click="handleLogout">退出</el-button>
+          <el-dropdown trigger="click" @command="handleCommand">
+            <span class="user-dropdown">
+              <span class="user-avatar">{{ authStore.username?.charAt(0).toUpperCase() }}</span>
+              <span class="user-name">{{ authStore.username }}</span>
+              <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">
+                  <el-icon><User /></el-icon>
+                  <span>个人中心</span>
+                </el-dropdown-item>
+                <el-dropdown-item command="orders">
+                  <el-icon><ShoppingBag /></el-icon>
+                  <span>我的订单</span>
+                </el-dropdown-item>
+                <el-dropdown-item divided command="logout">
+                  <el-icon><SwitchButton /></el-icon>
+                  <span>退出登录</span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </div>
     </header>
@@ -66,7 +87,8 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Camera } from '@element-plus/icons-vue'
+import { Camera, ArrowDown, User, ShoppingBag, SwitchButton } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -79,9 +101,20 @@ const goToProducts = () => {
   router.push('/products')
 }
 
-const handleLogout = () => {
-  authStore.logout()
-  router.push('/login')
+const handleCommand = (command: string) => {
+  switch (command) {
+    case 'profile':
+      router.push('/user/profile')
+      break
+    case 'orders':
+      router.push('/orders')
+      break
+    case 'logout':
+      ElMessage.success('退出成功')
+      authStore.logout()
+      router.push('/login')
+      break
+  }
 }
 </script>
 
@@ -145,12 +178,49 @@ const handleLogout = () => {
 .user-info {
   display: flex;
   align-items: center;
-  gap: $spacing-2;
-  
-  span {
-    color: $text-primary;
-    font-weight: 500;
+}
+
+.user-dropdown {
+  display: flex;
+  align-items: center;
+  gap: $spacing-1;
+  cursor: pointer;
+  padding: $spacing-1 $spacing-2;
+  border-radius: $radius-base;
+  transition: all $duration-base $easing-ease-in-out;
+
+  &:hover {
+    background: $bg-tertiary;
   }
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: $primary-gradient;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.user-name {
+  color: $text-primary;
+  font-weight: 500;
+  font-size: $font-size-sm;
+}
+
+.dropdown-icon {
+  color: $text-secondary;
+  font-size: 12px;
+  transition: transform $duration-base $easing-ease-in-out;
+}
+
+.user-dropdown:hover .dropdown-icon {
+  transform: translateY(2px);
 }
 
 // Main content
