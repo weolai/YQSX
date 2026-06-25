@@ -23,6 +23,22 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/din/users/:path*',
+        destination: 'http://127.0.0.1:8000/api/recommend/users/:path*',
+      },
+      {
+        source: '/api/din/topk',
+        destination: 'http://127.0.0.1:8000/api/recommend/topk',
+      },
+      {
+        source: '/api/din/recommend',
+        destination: 'http://127.0.0.1:8000/api/recommend',
+      },
+      {
+        source: '/api/din/:path*',
+        destination: 'http://127.0.0.1:8000/api/recommend/:path*',
+      },
+      {
         source: '/api/:path*',
         destination: 'http://localhost:8080/api/:path*',
       },

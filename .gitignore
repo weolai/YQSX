@@ -79,6 +79,18 @@ tmp-*.mjs
 tmp_test_*.py
 login.json
 tmp_login.json
+final_verify.py
+restart_both.py
+restart_recog.py
+
+# ==================== DIN model data / cache ====================
+DIN/cache/
+DIN/recommend/
+DIN/*.weights.h5
+DIN/*.h5
+
+# ==================== Credential / password SQL ====================
+update_admin_password.sql
 
 # ==================== Windows reserved device names ====================
 nul

@@ -53,6 +53,58 @@ export interface Product {
   categoryName?: string
 }
 
+export interface RecommendationItem {
+  itemId: number
+  score: number
+  rank: number
+  reason: string
+}
+
+export interface RecommendationResponse {
+  code: number
+  msg: string
+  data: {
+    recommendList: number[]
+  }
+}
+
+export interface DinTopKResponse {
+  userId: number
+  items: RecommendationItem[]
+  modelVersion: string
+  dataVersion: string
+  year: number
+  hitCache: boolean
+  latencyMs: number
+}
+
+/**
+ * SpringBoot Product 服务 /products/din/topk 响应
+ * 后端已聚合商品详情、缓存状态、耗时、版本、降级标记
+ */
+export interface DinTopKBackendResponse {
+  userId: number
+  products: Product[]
+  hitCache: boolean
+  latencyMs: number
+  modelVersion: string
+  dataVersion: string
+  year: number
+  fallback: boolean
+  /** 推荐状态：normal=正常推荐, fallback=后端降级, blocked=Sentinel限流 */
+  status: string
+  /** 推荐理由摘要 */
+  reason: string
+}
+
+export interface CachedUserSampleResponse {
+  userIds: number[]
+  modelVersion: string
+  dataVersion: string
+  year: number
+  onlyCached: boolean
+}
+
 export interface BoundingBox {
   x1: number
   y1: number
@@ -108,18 +160,4 @@ export interface PaymentResponse {
   msg: string
   orderId: number
   orderUpdateResult: string
-}
-
-// DIN 推荐相关
-export interface DinRecommendItem {
-  itemId: number
-  itemCategory: number
-  displayName: string
-  displayImage: string
-  score: number
-  pvCount: number
-  cartCount: number
-  favCount: number
-  buyCount: number
-  popularityScore: number
 }

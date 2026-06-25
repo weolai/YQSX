@@ -56,7 +56,7 @@ export function RecognitionResultPanel({
           <Button
             onClick={onUploadClick}
             variant="outline"
-            className="rounded-full glass hover:bg-white hover:text-foreground hover:border-foreground/20"
+            className="rounded-full glass"
           >
             重新上传
           </Button>
@@ -80,7 +80,7 @@ export function RecognitionResultPanel({
                 {result.detectedCount} 个目标
               </Badge>
             </div>
-            {(!result.detections || result.detections.length === 0) ? (
+            {result.detections.length === 0 ? (
               <p className="text-sm text-muted-foreground">未检测到零食，请尝试上传更清晰的图片</p>
             ) : (
               <StaggerContainer className="space-y-3">
@@ -133,8 +133,16 @@ export function RecognitionResultPanel({
                       onClick={() => router.push(`/products/${product.id}`)}
                       className="flex items-center p-4 rounded-xl bg-secondary/30 border border-border/50 hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group"
                     >
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center flex-shrink-0 mr-4">
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center flex-shrink-0 mr-4 relative overflow-hidden">
                         <Package className="h-6 w-6 text-primary" />
+                        {product.imageUrl && (
+                          <img
+                            src={product.imageUrl}
+                            alt={product.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = 'none' }}
+                          />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
@@ -154,7 +162,7 @@ export function RecognitionResultPanel({
               <div className="mt-6 text-center">
                 <MagneticButton
                   onClick={() => router.push('/products')}
-                  className="h-11 px-6 bg-white text-foreground border border-foreground/20 hover:bg-accent hover:text-accent-foreground shadow-sm"
+                  className="h-11 px-6 bg-primary text-white hover:bg-primary/90 shadow-md shadow-primary/20"
                 >
                   浏览全部商品
                 </MagneticButton>

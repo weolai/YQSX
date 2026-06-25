@@ -1,12 +1,11 @@
 import { create } from 'zustand'
-import { authApi, productApi } from '@/lib/api'
+import { authApi } from '@/lib/api'
 import type { UserInfo } from '@/types'
 
 interface AuthState {
   token: string | null
   userInfo: UserInfo | null
   isLoggedIn: boolean
-  tianchiUserId: number | null
   login: (username: string, password: string) => Promise<boolean>
   register: (data: { phone: string; code: string; username: string; password: string; nickname?: string }) => Promise<boolean | string>
   resetPassword: (data: { phone: string; code: string; newPassword: string }) => Promise<string | true>
@@ -14,8 +13,6 @@ interface AuthState {
   setAuth: (token: string, userId: number, username: string) => void
   logout: () => void
   setUserInfo: (info: UserInfo) => void
-  ensureTianchiUserId: () => Promise<number | null>
-  setTianchiUserId: (uid: number) => void
 }
 
 /**
@@ -51,9 +48,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     ? safeParse<UserInfo | null>(localStorage.getItem('userInfo'), null)
     : null,
   isLoggedIn: typeof window !== 'undefined' ? !!localStorage.getItem('token') : false,
-  tianchiUserId: typeof window !== 'undefined'
-    ? safeParse<number | null>(localStorage.getItem('tianchi_user_id'), null)
-    : null,
 
   login: async (username: string, password: string) => {
     try {
@@ -165,14 +159,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       token: null,
       userInfo: null,
-      isLoggedIn: false,
-      tianchiUserId: null
+      isLoggedIn: false
     })
 
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token')
       localStorage.removeItem('userInfo')
-      localStorage.removeItem('tianchi_user_id')
       syncTokenToCookie(null)
     }
   },
@@ -181,39 +173,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ userInfo: info })
     if (typeof window !== 'undefined') {
       localStorage.setItem('userInfo', JSON.stringify(info))
-    }
-  },
-
-  ensureTianchiUserId: async () => {
-    // 如果已有天池用户ID，直接返回
-    const current = (typeof window !== 'undefined') ? localStorage.getItem('tianchi_user_id') : null
-    if (current) {
-      const uid = parseInt(current, 10)
-      set({ tianchiUserId: uid })
-      return uid
-    }
-
-    // 调用后端获取样本用户列表，随机选一个
-    try {
-      const users = await productApi.getSampleUsers()
-      if (users && users.length > 0) {
-        const randomUser = users[Math.floor(Math.random() * users.length)]
-        set({ tianchiUserId: randomUser })
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('tianchi_user_id', randomUser.toString())
-        }
-        return randomUser
-      }
-    } catch (error) {
-      console.error('分配天池用户ID失败:', error)
-    }
-    return null
-  },
-
-  setTianchiUserId: (uid: number) => {
-    set({ tianchiUserId: uid })
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('tianchi_user_id', uid.toString())
     }
   }
 }))

@@ -4,7 +4,7 @@ import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.gec.shop.product.pojo.Product;
 import com.gec.shop.product.service.ProductService;
-import com.gec.shop.product.vo.DinRecommendVo;
+import com.gec.shop.product.vo.DinRecommendResponseVo;
 import com.gec.shop.product.vo.RecognitionResponseVo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -72,35 +71,38 @@ public class ProductController {
     }
 
     /**
-     * 基于 DIN 模型的个性化推荐
-     * 输入天池用户ID，返回推荐商品列表
+     * 基于 DIN 模型获取用户 TopK 推荐
+     * <p>
+     * 后端调用 Python 推荐服务（含多级缓存），返回带缓存状态、模型版本、耗时的推荐结果。
      */
-    @GetMapping("/recommend/din")
-    @SentinelResource(value = "product.recommendDin", blockHandler = "recommendDinBlockHandler")
-    public List<DinRecommendVo> recommendByDin(@RequestParam Long userId,
-                                                @RequestParam(value = "topK", defaultValue = "10") Integer topK) {
-        log.info("收到 DIN 推荐请求, userId={}, topK={}", userId, topK);
-        return productService.recommendByDin(userId, topK);
+    @GetMapping("/din/topk")
+    @SentinelResource(value = "product.dinTopK", blockHandler = "dinTopKBlockHandler")
+    public DinRecommendResponseVo dinTopK(@RequestParam("userId") Long userId,
+                                          @RequestParam(value = "k", defaultValue = "10") Integer k) {
+        // 限制 k 最大值，防止大 k 造成网络和渲染压力
+        if (k == null || k <= 0) {
+            k = 10;
+        } else if (k > 40) {
+            k = 40;
+        }
+        log.info("收到 DIN 推荐请求, userId={}, k={}", userId, k);
+        return productService.getDinTopKRecommendations(userId, k);
     }
 
-    public List<DinRecommendVo> recommendDinBlockHandler(Long userId, Integer topK, BlockException e) {
-        log.warn("DIN 推荐被限流: userId={}, topK={}", userId, topK);
-        return Collections.emptyList();
-    }
-
-    /**
-     * 获取样本用户ID列表 (行为最丰富的用户)
-     */
-    @GetMapping("/recommend/users")
-    @SentinelResource(value = "product.sampleUsers", blockHandler = "sampleUsersBlockHandler")
-    public List<Long> getSampleUsers() {
-        log.info("收到获取样本用户列表请求");
-        return productService.getSampleUserIds();
-    }
-
-    public List<Long> sampleUsersBlockHandler(BlockException e) {
-        log.warn("获取样本用户被限流");
-        return Collections.emptyList();
+    public DinRecommendResponseVo dinTopKBlockHandler(Long userId, Integer k, BlockException e) {
+        log.warn("DIN 推荐被限流, userId={}, k={}", userId, k);
+        DinRecommendResponseVo response = new DinRecommendResponseVo();
+        response.setUserId(userId);
+        response.setFallback(true);
+        response.setStatus("blocked");
+        response.setHitCache(false);
+        response.setLatencyMs(0L);
+        response.setModelVersion("blocked");
+        response.setDataVersion("blocked");
+        response.setYear(0);
+        response.setProducts(null);
+        response.setReason("推荐请求过于频繁，请稍后再试");
+        return response;
     }
 
     /**

@@ -5,6 +5,8 @@ import { motion, useSpring, useMotionValue, useTransform, AnimatePresence } from
 import { useIsClient } from "@/hooks/use-is-client";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { MascotFace, type Mood } from "@/components/fun/mascot-face";
+import { QaDialog } from "@/components/kboqa/qa-dialog";
+import type { KboqaState } from "@/lib/kboqa/types";
 
 interface Particle {
   id: number;
@@ -14,12 +16,12 @@ interface Particle {
 }
 
 const TIPS = [
+  "双击我可以打开智能问答哦~",
   "点我一下，我会跳舞哦~",
   "去拍照识别看看新零食吧！",
   "今天想吃什么口味的零食？",
   "我可以陪你逛一整天~",
-  "鼠标移开我要睡觉啦...",
-  "试试点击我的脑袋！",
+  "试试双击我的脑袋！",
 ];
 
 const MOODS: Mood[] = ["idle", "happy", "wink", "surprised", "love"];
@@ -33,6 +35,8 @@ export function SnackMascot() {
   const [tipIndex, setTipIndex] = useState(0);
   const [particles, setParticles] = useState<Particle[]>([]);
   const [isSleepy, setIsSleepy] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [kboqaState, setKboqaState] = useState<KboqaState>("idle");
   const particleIdRef = useRef(0);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const moodTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -150,6 +154,7 @@ export function SnackMascot() {
 
       <motion.button
         onClick={handleClick}
+        onDoubleClick={() => setDialogOpen(true)}
         onMouseEnter={handleHoverStart}
         onMouseLeave={handleHoverEnd}
         animate={
@@ -257,8 +262,10 @@ export function SnackMascot() {
         transition={isHovered ? {} : { delay: 2, duration: 4, repeat: Infinity, repeatDelay: 8 }}
         className="text-[10px] font-medium text-muted-foreground bg-card/80 px-2 py-1 rounded-full glass"
       >
-        {isHovered ? "再点我一下~" : isSleepy ? "小人在睡觉..." : "我来陪你逛零食 ~"}
+        {isHovered ? "双击打开问答~" : isSleepy ? "小人在睡觉..." : "双击我打开智能问答 ~"}
       </motion.span>
+
+      <QaDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
     </motion.div>
   );
 }

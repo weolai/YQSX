@@ -3,9 +3,11 @@ package com.gec.shop.product.service.impl;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.gec.shop.product.feign.DinRecommendFeignClient;
 import com.gec.shop.product.feign.RecognitionFeignClient;
 import com.gec.shop.product.feign.dto.DetectionDto;
-import com.gec.shop.product.feign.dto.DinRecommendDto;
+import com.gec.shop.product.feign.dto.DinTopKResponseDto;
+import com.gec.shop.product.feign.dto.RecommendationItemDto;
 import com.gec.shop.product.feign.dto.RecognitionResultDto;
 import com.gec.shop.product.mapper.ProductCategoryMapper;
 import com.gec.shop.product.mapper.ProductMapper;
@@ -14,7 +16,7 @@ import com.gec.shop.product.pojo.Product;
 import com.gec.shop.product.pojo.ProductCategory;
 import com.gec.shop.product.pojo.RecognitionLog;
 import com.gec.shop.product.service.ProductService;
-import com.gec.shop.product.vo.DinRecommendVo;
+import com.gec.shop.product.vo.DinRecommendResponseVo;
 import com.gec.shop.product.vo.RecognitionResponseVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +41,9 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     @Autowired
     private RecognitionFeignClient recognitionFeignClient;
+
+    @Autowired
+    private DinRecommendFeignClient dinRecommendFeignClient;
 
     @Autowired
     private ProductCategoryMapper productCategoryMapper;
@@ -376,6 +381,75 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         Product getProduct() { return product; }
     }
 
+    /**
+     * DIN 推荐最大返回数量，防止大 k 值导致网络传输和前端渲染压力
+     */
+    private static final int MAX_TOP_K = 40;
+
+    @Override
+    public DinRecommendResponseVo getDinTopKRecommendations(Long userId, Integer k) {
+        // 参数校验与上限控制
+        int safeK = (k == null || k <= 0) ? 10 : Math.min(k, MAX_TOP_K);
+
+        DinRecommendResponseVo response = new DinRecommendResponseVo();
+        response.setUserId(userId);
+        response.setFallback(false);
+        response.setStatus("normal");
+
+        // 调用 Python 推荐服务（超时/异常会触发 Feign Fallback）
+        DinTopKResponseDto recommendResult;
+        try {
+            recommendResult = dinRecommendFeignClient.getTopKRecommendations(userId, safeK);
+        } catch (Exception e) {
+            log.error("调用 DIN 推荐服务异常, userId={}, k={}", userId, safeK, e);
+            recommendResult = null;
+        }
+
+        // 服务不可用或返回空时，降级为热销商品列表
+        boolean fallback = recommendResult == null
+                || "fallback".equals(recommendResult.getModelVersion())
+                || CollectionUtils.isEmpty(recommendResult.getItems());
+
+        List<Product> products;
+        if (fallback) {
+            log.warn("DIN 推荐结果为空或降级, userId={}, 返回热销商品兜底", userId);
+            response.setFallback(true);
+            response.setStatus("fallback");
+            response.setReason("推荐服务暂时不可用，已为您切换为热销商品");
+            products = lambdaQuery()
+                    .orderByDesc(Product::getSales)
+                    .last("LIMIT " + safeK)
+                    .list();
+        } else {
+            List<Long> itemIds = recommendResult.getItems().stream()
+                    .map(RecommendationItemDto::getItemId)
+                    .collect(Collectors.toList());
+            // 批量查询商品详情，保持推荐顺序
+            List<Product> dbProducts = baseMapper.selectBatchIds(itemIds);
+            Map<Long, Product> productMap = dbProducts.stream()
+                    .collect(Collectors.toMap(Product::getId, p -> p));
+            products = recommendResult.getItems().stream()
+                    .map(item -> productMap.get(item.getItemId()))
+                    .filter(Objects::nonNull)
+                    .limit(safeK)
+                    .collect(Collectors.toList());
+
+            // 设置推荐理由摘要
+            boolean hitCache = Boolean.TRUE.equals(recommendResult.getHitCache());
+            response.setReason(hitCache
+                    ? "基于用户历史行为的个性化推荐（命中缓存）"
+                    : "基于用户历史行为的个性化推荐（实时计算）");
+        }
+
+        response.setProducts(products);
+        response.setHitCache(recommendResult != null && Boolean.TRUE.equals(recommendResult.getHitCache()));
+        response.setLatencyMs(recommendResult != null ? recommendResult.getLatencyMs() : 0L);
+        response.setModelVersion(recommendResult != null ? recommendResult.getModelVersion() : "unknown");
+        response.setDataVersion(recommendResult != null ? recommendResult.getDataVersion() : "unknown");
+        response.setYear(recommendResult != null ? recommendResult.getYear() : 0);
+        return response;
+    }
+
     @Override
     public List<Product> recommendByCategory(Long categoryId, Integer limit) {
         if (categoryId == null || limit == null || limit <= 0) {
@@ -392,79 +466,6 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
             products.forEach(p -> p.setCategoryName(category.getDisplayName()));
         }
         return products;
-    }
-
-    /**
-     * 基于 DIN 模型的个性化推荐
-     * 调用 Python 推理服务，返回天池数据集商品的推荐结果
-     */
-    @Override
-    public List<DinRecommendVo> recommendByDin(Long userId, Integer topK) {
-        if (userId == null || topK == null || topK <= 0) {
-            return new ArrayList<>();
-        }
-
-        // 构建 Feign 请求参数
-        Map<String, Object> request = new HashMap<>();
-        request.put("user_id", userId);
-        request.put("top_k", topK);
-
-        // 调用 Python DIN 推理服务
-        DinRecommendDto dto = recognitionFeignClient.dinRecommend(request);
-        if (dto == null || dto.getData() == null || dto.getData().isEmpty()) {
-            log.warn("DIN 推荐返回空结果, userId={}", userId);
-            return new ArrayList<>();
-        }
-
-        // 转换 DTO -> VO
-        List<DinRecommendVo> result = new ArrayList<>();
-        for (DinRecommendDto.DinRecommendItem item : dto.getData()) {
-            DinRecommendVo vo = new DinRecommendVo();
-            vo.setItemId(item.getItemId());
-            vo.setItemCategory(item.getItemCategory());
-            vo.setScore(item.getScore());
-            vo.setPvCount(item.getPvCount() != null ? item.getPvCount() : 0);
-            vo.setCartCount(item.getCartCount() != null ? item.getCartCount() : 0);
-            vo.setFavCount(item.getFavCount() != null ? item.getFavCount() : 0);
-            vo.setBuyCount(item.getBuyCount() != null ? item.getBuyCount() : 0);
-
-            // 生成展示名称
-            vo.setDisplayName("类目" + item.getItemCategory() + "精选 #" + item.getItemId());
-
-            // 生成展示图片 (文生图 API)
-            String prompt = "snack product packaging, category " + item.getItemCategory() + ", warm tone, product photography";
-            String encodedPrompt = java.net.URLEncoder.encode(prompt, java.nio.charset.StandardCharsets.UTF_8);
-            vo.setDisplayImage("https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=" + encodedPrompt + "&image_size=square");
-
-            // 计算综合热度分
-            int popularity = vo.getPvCount() + vo.getCartCount() * 2 + (int)(vo.getFavCount() * 1.5) + vo.getBuyCount() * 3;
-            vo.setPopularityScore(popularity);
-
-            result.add(vo);
-        }
-
-        log.info("DIN 推荐完成, userId={}, 返回 {} 个推荐", userId, result.size());
-        return result;
-    }
-
-    /**
-     * 获取样本用户ID列表 (行为最丰富的用户)
-     */
-    @Override
-    public List<Long> getSampleUserIds() {
-        DinRecommendDto dto = recognitionFeignClient.getSampleUsers();
-        if (dto == null || dto.getUsers() == null) {
-            log.warn("获取样本用户返回空结果");
-            return new ArrayList<>();
-        }
-        List<Long> userIds = new ArrayList<>();
-        for (Integer uid : dto.getUsers()) {
-            if (uid != null) {
-                userIds.add(uid.longValue());
-            }
-        }
-        log.info("获取样本用户列表, 返回 {} 个用户ID", userIds.size());
-        return userIds;
     }
 
     @Override

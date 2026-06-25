@@ -2,7 +2,7 @@ package com.gec.shop.product.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.gec.shop.product.pojo.Product;
-import com.gec.shop.product.vo.DinRecommendVo;
+import com.gec.shop.product.vo.DinRecommendResponseVo;
 import com.gec.shop.product.vo.RecognitionResponseVo;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -22,20 +22,13 @@ public interface ProductService extends IService<Product> {
     List<Product> recommendByCategory(Long categoryId, Integer limit);
 
     /**
-     * 基于 DIN 模型的个性化推荐
+     * 基于 DIN 模型获取用户 TopK 推荐
      *
-     * @param userId 天池用户ID
-     * @param topK   返回数量
-     * @return 推荐商品列表
+     * @param userId 用户 ID
+     * @param k      推荐数量，限制 ≤ 40
+     * @return 推荐结果 VO（含商品详情、缓存状态、耗时等）
      */
-    List<DinRecommendVo> recommendByDin(Long userId, Integer topK);
-
-    /**
-     * 获取样本用户ID列表 (行为最丰富的用户)
-     *
-     * @return 用户ID列表
-     */
-    List<Long> getSampleUserIds();
+    DinRecommendResponseVo getDinTopKRecommendations(Long userId, Integer k);
 
     /**
      * 查询商品列表，支持按类别筛选

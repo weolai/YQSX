@@ -1,5 +1,5 @@
 import request from './request'
-import type { LoginResponse, RegisterResponse, ResetPasswordResponse, SendCodeResponse, UserInfo, Product, RecognitionResponse, Order, OrderCreateResponse, PaymentResponse, DinRecommendItem } from '@/types'
+import type { LoginResponse, RegisterResponse, ResetPasswordResponse, SendCodeResponse, UserInfo, Product, RecognitionResponse, Order, OrderCreateResponse, PaymentResponse, RecommendationResponse, DinTopKResponse, DinTopKBackendResponse, CachedUserSampleResponse } from '@/types'
 
 // 认证接口
 export const authApi = {
@@ -57,23 +57,44 @@ export const productApi = {
     if (uid) {
       formData.append('uid', uid.toString())
     }
-
+    
     return request.post<RecognitionResponse>('/products/recognize', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 60000
     })
   },
 
-  // DIN 个性化推荐
-  getDinRecommend: (userId: number, topK: number = 10) => {
-    return request.get<DinRecommendItem[]>('/products/recommend/din', {
-      params: { userId, topK }
+  // DIN 商品推荐（旧接口，兼容保留）
+  getDinRecommendations: (userId: number, topK: number = 40) => {
+    return request.post<RecommendationResponse>('/din/recommend', {
+      userId,
+      topK
     })
   },
 
-  // 获取样本用户列表
-  getSampleUsers: () => {
-    return request.get<number[]>('/products/recommend/users')
+  // ========== 调试/诊断接口（生产环境请使用 getDinTopKFromBackend） ==========
+
+  // [调试] 获取缓存中真实存在的用户 ID 列表（直连 Python 服务，仅用于诊断缓存状态）
+  getCachedUserSample: (n: number = 100, onlyCached: boolean = true) => {
+    return request.get<CachedUserSampleResponse>('/din/users/sample', {
+      params: { n, onlyCached }
+    })
+  },
+
+  // [调试] DIN TopK 推荐原始接口，直连 Python 服务，无后端兜底（仅用于诊断）
+  getDinTopK: (userId: number, k: number = 40) => {
+    return request.get<DinTopKResponse>('/din/topk', {
+      params: { userId, k }
+    })
+  },
+
+  // ========== 生产业务接口 ==========
+
+  // [生产] 通过 SpringBoot Product 服务调用 DIN 推荐，后端聚合商品详情与降级兜底
+  getDinTopKFromBackend: (userId: number, k: number = 8) => {
+    return request.get<DinTopKBackendResponse>('/products/din/topk', {
+      params: { userId, k }
+    })
   }
 }
 

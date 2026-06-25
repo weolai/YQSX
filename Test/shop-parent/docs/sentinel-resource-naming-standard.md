@@ -24,6 +24,8 @@ ${module_name}.${function_name}
 | 应用 | REST 端点 | Sentinel 资源名 | 说明 |
 |---|---|---|---|
 | shop-product-service | `GET /products/{pid}` | `product.getById` | 商品详情查询 |
+| shop-product-service | `GET /products/din/topk` | `product.dinTopK` | DIN 个性化推荐 |
+| shop-product-service | `POST /products/recognize` | `product.recognize` | 拍照识别商品 |
 | shop-user-service | `POST /user/login` | `user.login` | 用户登录 |
 | shop-order-service | `POST /orders/save` | `order.create` | 创建订单 |
 | shop-order-service | `GET /orders/{id}` | `order.getById` | 订单详情查询 |

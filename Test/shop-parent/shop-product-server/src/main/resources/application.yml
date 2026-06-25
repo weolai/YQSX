@@ -18,10 +18,19 @@ spring:
     sentinel:
       transport:
         port: 8723
+  # Sentinel 本地规则开关（默认启用，可通过 Nacos 配置中心或环境变量关闭）
+sentinel:
+  rule:
+    enabled: true
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 20MB
+
+# DIN 推荐服务地址（Python FastAPI 服务）
+din:
+  recommend:
+    url: http://127.0.0.1:8000
 
 feign:
   sentinel:
@@ -34,3 +43,6 @@ feign:
       shop-recognition-service:
         connectTimeout: 5000
         readTimeout: 60000
+      din-recommend-service:
+        connectTimeout: 500
+        readTimeout: 3000

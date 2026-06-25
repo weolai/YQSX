@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Camera, Sparkles, ShoppingBag, Zap, ArrowRight } from "lucide-react";
+import { Camera, Sparkles, ShoppingBag, Zap, ArrowRight, ListOrdered } from "lucide-react";
 import { Navbar } from "@/components/layout/navbar";
 import { Card } from "@/components/ui/card";
 import { PixelHero } from "@/components/ui/pixel-hero";
@@ -24,12 +24,12 @@ export default function HomePage() {
     },
     {
       icon: Sparkles,
-      title: "AI 推荐",
-      description: "基于识别结果智能推荐相似商品，发现更多美味选择。",
-      href: "/products",
+      title: "DIN 推荐",
+      description: "输入用户 ID 即可返回 Top40 纯数字商品 ID，直连推荐服务。",
+      href: "/recognize",
     },
     {
-      icon: ShoppingBag,
+      icon: ListOrdered,
       title: "便捷下单",
       description: "一键购买，快速完成订单，享受流畅的购物体验。",
       href: "/orders",
@@ -72,7 +72,7 @@ export default function HomePage() {
                 让零食购物更简单
               </h2>
               <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-                结合计算机视觉与推荐算法，打造从识别到下单的一站式智能体验。
+                结合 DIN 推荐算法与智能前端展示，打造从登录、推荐到结果展示的一站式体验。
               </p>
             </ScrollReveal>
 
@@ -169,7 +169,7 @@ export default function HomePage() {
                     准备好发现新口味了吗？
                   </h2>
                   <p className="text-muted-foreground text-lg max-w-xl mx-auto mb-8">
-                    立即体验 AI 拍照识别，让每一款零食都不再陌生。
+                    立即体验 DIN 推荐结果展示，让每一位用户都能看到自己的 Top40 商品 ID。
                   </p>
                   <MagneticButton
                     onClick={() => router.push("/recognize")}

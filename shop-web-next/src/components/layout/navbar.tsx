@@ -20,7 +20,7 @@ import { useIsClient } from "@/hooks/use-is-client";
 const navItems: NavItem[] = [
   { id: "home", icon: <Home />, label: "首页", href: "/" },
   { id: "recognize", icon: <Camera />, label: "拍照识别", href: "/recognize" },
-  { id: "recommend", icon: <Sparkles />, label: "智能推荐", href: "/recommend" },
+  { id: "recommend", icon: <Sparkles />, label: "DIN 推荐", href: "/recognize" },
   { id: "products", icon: <ShoppingBag />, label: "商品列表", href: "/products" },
   { id: "orders", icon: <ClipboardList />, label: "我的订单", href: "/orders" },
 ];
@@ -53,11 +53,9 @@ export function Navbar() {
             </span>
           </Link>
 
-          <div className="hidden md:block flex-1 px-6">
-            <LimelightNav items={navItems} className="mx-auto" />
-          </div>
+          <LimelightNav items={navItems} />
 
-          <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center space-x-4">
             {!isClient ? (
               <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
             ) : isLoggedIn && userInfo ? (
@@ -89,17 +87,12 @@ export function Navbar() {
             ) : (
               <button
                 onClick={() => router.push("/login")}
-                className="inline-flex h-10 items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-medium text-foreground border border-foreground/20 transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-lg hover:shadow-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 登录
               </button>
             )}
           </div>
-        </div>
-
-        {/* 移动端导航 */}
-        <div className="md:hidden pb-3 -mt-1">
-          <LimelightNav items={navItems} className="w-full" />
         </div>
       </div>
     </motion.nav>

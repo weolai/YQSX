@@ -167,7 +167,15 @@ export default function ProductDetailPage() {
                   >
                     <Package className="h-32 w-32 text-primary/40" />
                   </motion.div>
-                  <div className="absolute top-4 left-4">
+                  {product.imageUrl && (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  )}
+                  <div className="absolute top-4 left-4 z-10">
                     <Badge className="bg-primary text-white border-0">
                       <Sparkles className="mr-1 h-3 w-3" />
                       {product.categoryName || '零食'}

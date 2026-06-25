@@ -23,6 +23,15 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
+  const [recommendUserId, setRecommendUserId] = useState<number | null>(null)
+  const [recommendations, setRecommendations] = useState<Product[]>([])
+  const [recLoading, setRecLoading] = useState(true)
+  const [recLatency, setRecLatency] = useState<number>(0)
+  const [recHitCache, setRecHitCache] = useState<boolean>(false)
+  const [recFallback, setRecFallback] = useState<boolean>(false)
+  const [recStatus, setRecStatus] = useState<string>('normal')
+  const [recReason, setRecReason] = useState<string>('')
+
   const categoryTags = Array.from(new Set(products.map(p => p.categoryName).filter((name): name is string => Boolean(name))))
 
   useEffect(() => {
@@ -41,6 +50,37 @@ export default function ProductsPage() {
     loadProducts()
   }, [])
 
+  // 推荐加载逻辑抽成独立函数，支持"换一批"局部刷新
+  const loadRecommendations = async () => {
+    try {
+      setRecLoading(true)
+      // 从缓存中抽样一个真实用户，避免随机 userId 导致缓存 miss
+      const sampleRes = await productApi.getCachedUserSample(1, true)
+      const sampledUserId = sampleRes.userIds[0]
+      if (!sampledUserId) {
+        setRecLoading(false)
+        return
+      }
+      setRecommendUserId(sampledUserId)
+
+      const recRes = await productApi.getDinTopKFromBackend(sampledUserId, 8)
+      setRecommendations(recRes.products || [])
+      setRecLatency(recRes.latencyMs || 0)
+      setRecHitCache(recRes.hitCache || false)
+      setRecFallback(recRes.fallback || false)
+      setRecStatus(recRes.status || 'normal')
+      setRecReason(recRes.reason || '')
+    } catch (error) {
+      console.error('加载推荐失败:', error)
+    } finally {
+      setRecLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadRecommendations()
+  }, [])
+
   const handleProductClick = (id: number) => {
     router.push(`/products/${id}`)
   }
@@ -54,6 +94,84 @@ export default function ProductsPage() {
       <Navbar />
 
       <main className="container mx-auto px-4 py-12 sm:py-16">
+        {/* 个性化推荐区域 */}
+        <ScrollReveal className="mb-12">
+          <div className="rounded-2xl glass border border-border/50 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-semibold mb-1">为您推荐</h2>
+                <p className="text-sm text-muted-foreground">
+                  {recLoading
+                    ? '正在加载推荐结果...'
+                    : recStatus === 'blocked'
+                      ? `推荐请求被限流，请稍后再试`
+                      : recStatus === 'fallback'
+                        ? `基于用户 ${recommendUserId} · 已降级为热销商品 · ${recLatency}ms`
+                        : `基于用户 ${recommendUserId} 的个性化推荐 · ${recHitCache ? '命中缓存' : '实时计算'} · ${recLatency}ms`}
+                </p>
+                {recReason && !recLoading && (
+                  <p className="text-xs text-primary/70 mt-1">{recReason}</p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadRecommendations()}
+                disabled={recLoading}
+                className="rounded-full"
+              >
+                {recLoading ? '加载中...' : '换一批'}
+              </Button>
+            </div>
+            {recLoading ? (
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24 w-40 rounded-xl flex-shrink-0" />
+                ))}
+              </div>
+            ) : recommendations.length === 0 ? (
+              <EmptyState title="暂无推荐" icon={<Package className="h-8 w-8 text-primary/60" />} />
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {recommendations.map((product, index) => (
+                  <motion.div
+                    key={product.id}
+                    whileHover={{ y: -4 }}
+                    onClick={() => handleProductClick(product.id)}
+                    className="min-w-[160px] max-w-[160px] cursor-pointer"
+                  >
+                    <Card className="p-4 h-full glass border-border/50 rounded-xl hover:shadow-lg transition-all">
+                      <div className="aspect-square bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden">
+                        <Package className="h-8 w-8 text-primary/40" />
+                        {product.imageUrl && (
+                          <img
+                            src={product.imageUrl}
+                            alt={product.name}
+                            className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                            onError={(e) => { e.currentTarget.style.display = 'none' }}
+                          />
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-1">ID: {product.id}</p>
+                      <p className="text-sm font-medium line-clamp-2 mb-1">
+                        {product.name || `推荐商品 #${product.id}`}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className="text-xs">
+                          排名 {index + 1}
+                        </Badge>
+                        <span className="text-xs text-primary font-medium">
+                          ¥{product.price}
+                        </span>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </ScrollReveal>
+
         <ScrollReveal className="text-center mb-12">
           <TextShimmer className="text-sm font-medium tracking-wider uppercase mb-4" as="span">
             精选好物
@@ -133,8 +251,16 @@ export default function ProductsPage() {
                 >
                   <Card className="p-5 h-full glass border-border/50 rounded-2xl hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden">
                     <div className="aspect-square bg-gradient-to-br from-primary/10 to-accent/10 rounded-xl mb-5 flex items-center justify-center relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       <Package className="h-16 w-16 text-primary/40 group-hover:scale-110 group-hover:text-primary/60 transition-all duration-300" />
+                      {product.imageUrl && (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => { e.currentTarget.style.display = 'none' }}
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </div>
                     <h3 className="font-semibold mb-3 line-clamp-2 text-foreground group-hover:text-primary transition-colors">
                       {product.name}

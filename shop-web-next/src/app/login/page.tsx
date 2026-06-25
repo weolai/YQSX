@@ -4,15 +4,22 @@ import { Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { AuthFuse } from "@/components/ui/auth-fuse";
 import { useAuthStore } from "@/lib/stores/auth";
+import { useEffect } from "react";
 
 function LoginPageContent() {
   const router = useRouter();
-  const { login, register, resetPassword, sendCode } = useAuthStore();
+  const { login, register, resetPassword, sendCode, isLoggedIn } = useAuthStore();
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      router.replace("/");
+    }
+  }, [isLoggedIn, router]);
 
   const handleLogin = async (username: string, password: string): Promise<boolean | string> => {
     const result = await login(username, password);
     if (result === true) {
-      router.push("/products");
+      router.push("/");
       return true;
     }
     return "登录失败，请检查用户名和密码";
@@ -27,7 +34,7 @@ function LoginPageContent() {
   }): Promise<boolean | string> => {
     const result = await register(data);
     if (result === true) {
-      router.push("/products");
+      router.push("/");
       return true;
     }
     return result;
