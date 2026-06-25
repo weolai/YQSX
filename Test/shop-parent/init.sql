@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `t_product_category` (
 CREATE TABLE IF NOT EXISTS `t_product` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name` varchar(255) DEFAULT NULL COMMENT '商品名称',
-  `price` double(10,2) DEFAULT NULL COMMENT '商品价格',
+  `price` DECIMAL(10,2) DEFAULT NULL COMMENT '商品价格',
   `stock` int DEFAULT NULL COMMENT '库存',
   `category_id` bigint DEFAULT NULL COMMENT '商品类别ID',
   `image_url` varchar(500) DEFAULT NULL COMMENT '商品图片URL',
@@ -107,14 +107,18 @@ USE `shop-order`;
 
 CREATE TABLE IF NOT EXISTS `t_order` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `order_no` varchar(32) NOT NULL COMMENT '订单号（业务唯一标识）',
   `uid` bigint DEFAULT NULL COMMENT '用户id',
   `username` varchar(255) DEFAULT NULL COMMENT '用户名称',
   `pid` bigint DEFAULT NULL COMMENT '商品id',
   `product_name` varchar(255) DEFAULT NULL COMMENT '商品名称',
-  `product_price` double(255,0) DEFAULT NULL COMMENT '商品单价',
+  `product_price` DECIMAL(10,2) DEFAULT NULL COMMENT '商品单价',
   `number` int DEFAULT NULL COMMENT '购买数量',
   `status` varchar(32) NOT NULL DEFAULT 'WAIT_PAY' COMMENT '订单状态',
   `version` int NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_no` (`order_no`),
   KEY `idx_uid_pid_status` (`uid`, `pid`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';

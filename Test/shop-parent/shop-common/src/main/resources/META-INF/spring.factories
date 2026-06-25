@@ -1,0 +1,4 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.gec.shop.common.config.RedisLockAutoConfiguration,\
+  com.gec.shop.common.config.JwtAutoConfiguration,\
+  com.gec.shop.common.config.SentinelAutoConfiguration

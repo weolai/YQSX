@@ -1,16 +1,41 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Navbar } from '@/components/layout/navbar'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, Package, Clock, CheckCircle2, XCircle, CreditCard } from 'lucide-react'
+import { ArrowLeft, Package, CreditCard, User, Hash } from 'lucide-react'
+import { TextShimmer } from '@/components/ui/shimmer-text'
+import { ScrollReveal } from '@/components/design/scroll-reveal'
+import { MagneticButton } from '@/components/design/magnetic-button'
+import { LoadingState } from '@/components/async-state/loading-state'
+import { ErrorState } from '@/components/async-state/error-state'
+import { EmptyState } from '@/components/async-state/empty-state'
+import { OrderStatusBadge } from '@/components/orders/order-status-badge'
 import { orderApi } from '@/lib/api'
 import type { Order } from '@/types'
+
+const statusMessage: Record<string, { title: string; desc: string }> = {
+  WAIT_PAY: {
+    title: '订单待支付',
+    desc: '请在 30 分钟内完成支付，超时订单将自动取消',
+  },
+  PAID: {
+    title: '订单已支付',
+    desc: '商家正在准备发货，请耐心等待',
+  },
+  FINISHED: {
+    title: '订单已完成',
+    desc: '感谢你的购买，期待再次光临',
+  },
+  CANCELED: {
+    title: '订单已取消',
+    desc: '该订单已被取消，如有疑问请联系客服',
+  },
+}
 
 export default function OrderDetailPage() {
   const router = useRouter()
@@ -19,56 +44,63 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
+  // 加载订单（带 AbortController 防 Race Condition）
   useEffect(() => {
+    const controller = new AbortController()
     const loadOrder = async () => {
       try {
         setIsLoading(true)
+        setLoadError(null)
         const result = await orderApi.getById(orderId)
-        setOrder(result.data || result)
+        if (controller.signal.aborted) return
+        setOrder(result)
       } catch (error) {
-        console.error('加载订单失败:', error)
+        if (!controller.signal.aborted) {
+          console.error('加载订单失败:', error)
+          setLoadError('加载订单失败，请刷新重试')
+        }
       } finally {
-        setIsLoading(false)
+        if (!controller.signal.aborted) {
+          setIsLoading(false)
+        }
       }
     }
     loadOrder()
+    return () => controller.abort()
   }, [orderId])
 
-  const handlePayment = () => {
+  const handlePayment = useCallback(() => {
     router.push(`/payment/${orderId}`)
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'WAIT_PAY':
-        return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" />待支付</Badge>
-      case 'PAID':
-        return <Badge className="bg-green-500"><CheckCircle2 className="mr-1 h-3 w-3" />已支付</Badge>
-      case 'FINISHED':
-        return <Badge className="bg-blue-500"><CheckCircle2 className="mr-1 h-3 w-3" />已完成</Badge>
-      case 'CANCELED':
-        return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" />已取消</Badge>
-      default:
-        return <Badge variant="secondary">未知</Badge>
-    }
-  }
+  }, [router, orderId])
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-orange-50">
+      <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="container mx-auto px-4 py-12">
-          <div className="max-w-3xl mx-auto">
-            <Skeleton className="h-8 w-32 mb-8" />
-            <Card className="p-8">
+        <main className="container mx-auto px-4 py-12 sm:py-16">
+          <LoadingState className="max-w-3xl mx-auto">
+            <Skeleton className="h-10 w-24 mb-8 rounded-full" />
+            <Card className="p-8 glass border-border/50 rounded-2xl">
               <div className="space-y-4">
-                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-8 w-3/4" />
                 <Skeleton className="h-6 w-1/2" />
-                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full rounded-xl" />
               </div>
             </Card>
-          </div>
+          </LoadingState>
+        </main>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto px-4 py-12 sm:py-16">
+          <ErrorState message={loadError} onRetry={() => window.location.reload()} />
         </main>
       </div>
     )
@@ -76,99 +108,131 @@ export default function OrderDetailPage() {
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-orange-50">
+      <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="container mx-auto px-4 py-12">
-          <div className="text-center py-20">
-            <Package className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-600 text-lg mb-4">订单不存在</p>
-            <Button onClick={() => router.push('/orders')}>返回订单列表</Button>
-          </div>
+        <main className="container mx-auto px-4 py-12 sm:py-16">
+          <EmptyState
+            icon={<Package className="h-10 w-10 text-primary/60" />}
+            title="订单不存在"
+            action={
+              <Button
+                onClick={() => router.push('/orders')}
+                className="bg-white text-foreground border-foreground/20 hover:bg-accent hover:text-accent-foreground"
+              >
+                返回订单列表
+              </Button>
+            }
+          />
         </main>
       </div>
     )
   }
 
+  const totalAmount = order.productPrice * order.number
+  const message = statusMessage[order.status] || { title: '订单详情', desc: '' }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-orange-50">
+    <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-3xl mx-auto"
-        >
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="mb-8"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            返回
-          </Button>
+      <main className="container mx-auto px-4 py-12 sm:py-16">
+        <div className="max-w-3xl mx-auto">
+          <ScrollReveal>
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="mb-8 rounded-full hover:bg-accent hover:text-accent-foreground"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              返回
+            </Button>
+          </ScrollReveal>
 
-          <Card className="p-8 backdrop-blur-sm bg-white/80 border-0 shadow-lg">
-            <div className="flex items-center justify-between mb-8">
-              <h1 className="text-3xl font-bold">订单详情</h1>
-              {getStatusBadge(order.status)}
-            </div>
-
-            <div className="space-y-6">
-              {/* 订单信息 */}
-              <div className="grid grid-cols-2 gap-4">
+          <ScrollReveal delay={0.1}>
+            <Card className="p-8 glass border-border/50 rounded-2xl shadow-lg shadow-primary/5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-border/50">
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">订单编号</p>
-                  <p className="font-semibold">{order.id}</p>
+                  <TextShimmer className="text-sm font-medium tracking-wider uppercase mb-2" as="span">
+                    订单详情
+                  </TextShimmer>
+                  <h1 className="text-4xl md:text-5xl font-serif font-semibold text-foreground tracking-tight">
+                    {message.title}
+                  </h1>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">用户名</p>
-                  <p className="font-semibold">{order.username}</p>
-                </div>
+                <OrderStatusBadge status={order.status} className="self-start sm:self-auto text-sm px-3 py-1" />
               </div>
 
-              <div className="border-t pt-6">
-                <h2 className="font-semibold text-lg mb-4">商品信息</h2>
-                <div className="bg-gradient-to-r from-pink-50 to-orange-50 rounded-lg p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg mb-2">{order.productName}</h3>
-                      <p className="text-sm text-gray-600">数量: {order.number}</p>
+              <div className="space-y-6">
+                {/* 状态提示 */}
+                <div className="p-4 rounded-xl bg-secondary/30 border border-border/50">
+                  <p className="text-muted-foreground">{message.desc}</p>
+                </div>
+
+                {/* 订单信息 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-secondary/30 border border-border/50 flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Hash className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="w-20 h-20 bg-white rounded-lg flex items-center justify-center">
-                      <Package className="h-10 w-10 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">订单编号</p>
+                      <p className="font-semibold text-foreground">#{order.id}</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-lg">
-                    <span className="font-semibold">商品金额</span>
-                    <span className="text-2xl font-bold text-primary">
-                      ¥{(order.productPrice * order.number).toFixed(2)}
-                    </span>
+                  <div className="p-4 rounded-xl bg-secondary/30 border border-border/50 flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">下单用户</p>
+                      <p className="font-semibold text-foreground">{order.username}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 支付按钮 */}
-              {order.status === 'WAIT_PAY' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.5 }}
-                >
-                  <Button
-                    size="lg"
-                    onClick={handlePayment}
-                    className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 transition-all duration-300"
+                {/* 商品信息 */}
+                <div className="pt-2">
+                  <h2 className="font-semibold text-lg mb-4 text-foreground">商品信息</h2>
+                  <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl p-6 border border-primary/10">
+                    <div className="flex items-start justify-between gap-4 mb-6">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-lg mb-2 text-foreground line-clamp-2">{order.productName}</h3>
+                        <p className="text-sm text-muted-foreground">数量: {order.number} 件</p>
+                        <p className="text-sm text-muted-foreground">单价: ¥{order.productPrice.toFixed(2)}</p>
+                      </div>
+                      <div className="w-20 h-20 bg-background rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Package className="h-10 w-10 text-primary/40" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                      <span className="font-medium text-foreground">订单金额</span>
+                      <span className="text-3xl font-serif font-semibold text-primary">
+                        ¥{totalAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 支付按钮 */}
+                {order.status === 'WAIT_PAY' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.4 }}
                   >
-                    <CreditCard className="mr-2 h-5 w-5" />
-                    立即支付
-                  </Button>
-                </motion.div>
-              )}
-            </div>
-          </Card>
-        </motion.div>
+                    <MagneticButton
+                      onClick={handlePayment}
+                      className="w-full h-14 text-lg font-semibold bg-white text-foreground border border-foreground/20 hover:bg-accent hover:text-accent-foreground shadow-lg shadow-black/10 tracking-wide"
+                    >
+                      <CreditCard className="mr-2 h-5 w-5" />
+                      立即支付
+                    </MagneticButton>
+                  </motion.div>
+                )}
+              </div>
+            </Card>
+          </ScrollReveal>
+        </div>
       </main>
     </div>
   )

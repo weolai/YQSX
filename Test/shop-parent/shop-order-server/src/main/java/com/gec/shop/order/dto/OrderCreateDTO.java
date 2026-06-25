@@ -10,6 +10,10 @@ public class OrderCreateDTO implements Serializable {
 
     private Long pid;
     private Long uid;
+    /**
+     * 购买数量，默认1
+     */
+    private Integer number = 1;
 
     public OrderCreateDTO() {
     }
@@ -28,5 +32,13 @@ public class OrderCreateDTO implements Serializable {
 
     public void setUid(Long uid) {
         this.uid = uid;
+    }
+
+    public Integer getNumber() {
+        return number;
+    }
+
+    public void setNumber(Integer number) {
+        this.number = number;
     }
 }

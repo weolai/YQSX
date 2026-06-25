@@ -1,8 +1,6 @@
 package com.gec.shop.order.controller;
 
 import com.gec.shop.order.service.GoodService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -11,7 +9,6 @@ import java.util.concurrent.TimeUnit;
 
 @RestController
 public class SentinelController {
-    private static final Logger log = LoggerFactory.getLogger(SentinelController.class);
 
     @Autowired
     private GoodService goodService;

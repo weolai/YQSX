@@ -68,6 +68,18 @@ Desktop.ini
 .env.local
 .env.*.local
 
+# ==================== IDE / AI workspace cache ====================
+.trae/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ==================== Temporary / debug scripts ====================
+tmp-*.mjs
+tmp_test_*.py
+login.json
+tmp_login.json
+
 # ==================== Windows reserved device names ====================
 nul
 NUL

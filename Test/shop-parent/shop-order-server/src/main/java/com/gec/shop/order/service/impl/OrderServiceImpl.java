@@ -1,18 +1,26 @@
 package com.gec.shop.order.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.gec.shop.order.mapper.OrderMapper;
 import com.gec.shop.order.pojo.Order;
 import com.gec.shop.order.feign.IProductFeignService;
+import com.gec.shop.order.feign.IUserFeignService;
+import com.gec.shop.order.pojo.User;
 import com.gec.shop.order.service.OrderService;
 import com.gec.shop.product.pojo.Product;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 订单服务实现类
@@ -26,6 +34,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private IProductFeignService productFeignService;
 
     @Autowired
+    private IUserFeignService userFeignService;
+
+    @Autowired
     private MeterRegistry meterRegistry;
 
     private Counter orderCreateCounter;
@@ -37,29 +48,132 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .register(meterRegistry);
     }
 
+    /**
+     * 创建订单：编排参数校验、商品/用户信息获取、库存扣减、订单持久化与补偿回滚。
+     * 事务边界覆盖本方法，子方法仅承担单一职责，保持主流程清晰可读。
+     */
     @Override
-    public Order createOrder(Long pid, Long uid) {
-        // 使用OpenFeign调用商品服务
-        Product product = productFeignService.get(pid);
+    @Transactional(rollbackFor = Exception.class)
+    public Order createOrder(Long pid, Long uid, Integer number) {
+        validateCreateRequest(number);
+        Product product = fetchAndValidateProduct(pid, number);
+        String username = resolveUsername(uid);
+        reduceStockOrThrow(pid, number);
+        return buildAndSaveOrderWithCompensation(pid, uid, number, product, username);
+    }
 
-        if (product == null) {
+    /**
+     * 校验下单数量是否合法
+     */
+    private void validateCreateRequest(Integer number) {
+        if (number == null || number <= 0) {
+            throw new RuntimeException("购买数量必须大于0");
+        }
+    }
+
+    /**
+     * 获取商品并校验商品存在性与库存前置条件
+     */
+    private Product fetchAndValidateProduct(Long pid, Integer number) {
+        Product product = productFeignService.get(pid);
+        if (product == null || product.getId() == null || product.getId() <= 0) {
             throw new RuntimeException("商品不存在: pid=" + pid);
         }
+        if (product.getStock() != null && product.getStock() < number) {
+            throw new RuntimeException("库存不足: 当前库存=" + product.getStock() + ", 需求=" + number);
+        }
+        return product;
+    }
 
+    /**
+     * 通过Feign调用用户服务获取用户名，失败时降级使用兜底数据
+     */
+    private String resolveUsername(Long uid) {
+        try {
+            User user = userFeignService.get(uid, "true");
+            if (user != null && user.getUsername() != null) {
+                return user.getUsername();
+            }
+            log.warn("用户服务返回空数据，使用兜底用户名: uid={}", uid);
+        } catch (Exception e) {
+            log.warn("获取用户信息失败，使用兜底用户名: uid={}", uid, e);
+        }
+        return "user_" + uid;
+    }
+
+    /**
+     * 原子扣减库存，失败抛出异常
+     */
+    private void reduceStockOrThrow(Long pid, Integer number) {
+        boolean stockReduced = productFeignService.reduceStock(pid, number);
+        if (!stockReduced) {
+            throw new RuntimeException("库存不足或商品服务不可用: pid=" + pid + ", number=" + number);
+        }
+    }
+
+    /**
+     * 构建并保存订单，失败时补偿回滚库存
+     */
+    private Order buildAndSaveOrderWithCompensation(Long pid, Long uid, Integer number,
+                                                     Product product, String username) {
+        Order order = buildOrder(pid, uid, number, product, username);
+        try {
+            log.info("创建订单: uid={}, pid={}, number={}, orderNo={}", uid, pid, number, order.getOrderNo());
+            super.save(order);
+            orderCreateCounter.increment();
+        } catch (Exception e) {
+            log.error("订单创建失败，补偿回滚库存: pid={}, number={}", pid, number, e);
+            compensateRollbackStock(pid, number);
+            throw e;
+        }
+        return order;
+    }
+
+    /**
+     * 组装订单实体（不含持久化）
+     */
+    private Order buildOrder(Long pid, Long uid, Integer number, Product product, String username) {
         Order order = new Order();
+        String generatedOrderNo = generateOrderNo();
+        log.info("生成订单号: uid={}, pid={}, generatedOrderNo={}", uid, pid, generatedOrderNo);
+        order.setOrderNo(generatedOrderNo);
         order.setPid(pid);
         order.setProductName(product.getName());
         order.setProductPrice(product.getPrice());
         order.setUid(uid);
-        order.setUsername("dafei");
-        order.setNumber(1);
+        order.setUsername(username);
+        order.setNumber(number);
         order.setStatus("WAIT_PAY");
         order.setVersion(0);
-
-        log.info("创建订单: {}", order);
-        super.save(order);
-        orderCreateCounter.increment();
+        order.setCreateTime(LocalDateTime.now());
+        order.setUpdateTime(LocalDateTime.now());
         return order;
+    }
+
+    /**
+     * 补偿回滚库存（订单创建失败时调用），回滚失败仅记录日志需人工补偿
+     */
+    private void compensateRollbackStock(Long pid, Integer number) {
+        try {
+            productFeignService.rollbackStock(pid, number);
+        } catch (Exception rollbackEx) {
+            log.error("库存回滚失败，需人工补偿: pid={}, number={}", pid, number, rollbackEx);
+        }
+    }
+
+    /**
+     * 刷新订单中的商品名称，保持与商品库一致
+     * Feign 调用失败时仅记录日志，不影响订单查询
+     */
+    private void refreshProductName(Order order) {
+        try {
+            Product product = productFeignService.get(order.getPid());
+            if (product != null && product.getName() != null) {
+                order.setProductName(product.getName());
+            }
+        } catch (Exception e) {
+            log.warn("刷新商品名称失败, orderId={}, pid={}", order.getId(), order.getPid(), e);
+        }
     }
 
     @Override
@@ -68,15 +182,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (order == null) {
             return null;
         }
-        // 动态刷新商品名称，避免商品数据更新后订单展示不一致
-        try {
-            Product product = productFeignService.get(order.getPid());
-            if (product != null && product.getName() != null) {
-                order.setProductName(product.getName());
-            }
-        } catch (Exception e) {
-            log.warn("订单查询时刷新商品名称失败, orderId={}, pid={}", id, order.getPid(), e);
-        }
+        refreshProductName(order);
         return order;
     }
 
@@ -97,22 +203,35 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .eq(Order::getUid, uid)
                 .orderByDesc(Order::getId)
                 .list();
-        // 批量刷新商品名称，保持与商品库一致
-        return orders.stream()
-                .peek(order -> {
-                    try {
-                        Product product = productFeignService.get(order.getPid());
-                        if (product != null && product.getName() != null) {
-                            order.setProductName(product.getName());
-                        }
-                    } catch (Exception e) {
-                        log.warn("订单列表刷新商品名称失败, orderId={}, pid={}", order.getId(), order.getPid(), e);
-                    }
-                })
+        if (!orders.isEmpty()) {
+            refreshProductNamesBatch(orders);
+        }
+        return orders;
+    }
+
+    /**
+     * 批量刷新订单列表中的商品名称，1 次 Feign 调用替代 N 次
+     */
+    private void refreshProductNamesBatch(List<Order> orders) {
+        List<Long> pids = orders.stream()
+                .map(Order::getPid)
+                .distinct()
                 .collect(Collectors.toList());
+        try {
+            Map<Long, String> nameMap = productFeignService.batchGetProductNames(pids);
+            orders.forEach(order -> {
+                String name = nameMap.get(order.getPid());
+                if (name != null) {
+                    order.setProductName(name);
+                }
+            });
+        } catch (Exception e) {
+            log.warn("批量刷新商品名称失败, uid={}, orderCount={}", orders.isEmpty() ? null : orders.get(0).getUid(), orders.size(), e);
+        }
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int updateStatus(Long id, String status) {
         Order order = super.getById(id);
         if (order == null) {
@@ -127,10 +246,21 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (!isValidTransition(current, status)) {
             throw new RuntimeException("非法状态转换: " + current + " -> " + status);
         }
-        order.setStatus(status);
-        boolean success = super.updateById(order);
-        log.info("更新订单状态: id={}, {} -> {}, success={}", id, current, status, success);
-        return success ? 1 : 0;
+        // CAS 更新：WHERE id=? AND status=? 防止并发竞态
+        // 即使两个线程同时读到 WAIT_PAY，只有一个能更新成功
+        LambdaUpdateWrapper<Order> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(Order::getId, id)
+               .eq(Order::getStatus, current)
+               .set(Order::getStatus, status);
+        int rows = super.baseMapper.update(null, wrapper);
+        if (rows == 0) {
+            // 版本冲突：状态已被其他线程修改
+            log.warn("订单状态CAS更新失败(并发冲突): id={}, expected={}, actual={}",
+                    id, current, super.getById(id).getStatus());
+            return 0;
+        }
+        log.info("更新订单状态成功: id={}, {} -> {}", id, current, status);
+        return 1;
     }
 
     private boolean isValidTransition(String from, String to) {
@@ -144,5 +274,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             return true;
         }
         return false;
+    }
+
+    /**
+     * 生成订单号：yyyyMMddHHmmss + 6位随机数，共20位
+     * 同一秒内并发冲突概率极低，数据库唯一索引兜底
+     */
+    private String generateOrderNo() {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        int random = ThreadLocalRandom.current().nextInt(100000, 1000000);
+        return timestamp + random;
     }
 }

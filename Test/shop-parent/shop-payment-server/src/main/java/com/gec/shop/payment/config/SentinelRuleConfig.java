@@ -7,9 +7,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 
 @Component
 @ConditionalOnProperty(name = "sentinel.rule.enabled", havingValue = "true", matchIfMissing = true)

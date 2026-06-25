@@ -1,15 +1,29 @@
 server:
   port: 8084
 spring:
+  main:
+    lazy-initialization: true
   redis:
     host: localhost
     port: 6379
     database: 0
+    lettuce:
+      pool:
+        max-active: 16
+        max-idle: 8
+        min-idle: 2
+        max-wait: 3000ms
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/shop_payment?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8
-    username: root
-    password: 1234
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:1234}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 3000
+      idle-timeout: 600000
+      max-lifetime: 1800000
     schema: classpath:schema-mysql.sql
     initialization-mode: always
     continue-on-error: true
@@ -20,7 +34,7 @@ spring:
 
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
       id-type: auto
@@ -34,5 +48,10 @@ feign:
       default:
         connectTimeout: 5000
         readTimeout: 5000
+  httpclient:
+    enabled: true
+    max-connections: 200
+    max-connections-per-route: 50
+    connection-timeout: 2000
   sentinel:
     enabled: true

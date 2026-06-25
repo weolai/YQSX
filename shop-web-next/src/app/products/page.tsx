@@ -8,7 +8,12 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ShoppingBag, Package } from 'lucide-react'
+import { ShoppingBag, Package, ArrowRight } from 'lucide-react'
+import { TextShimmer } from '@/components/ui/shimmer-text'
+import { ScrollReveal, StaggerContainer, StaggerItem } from '@/components/design/scroll-reveal'
+import { MagneticButton } from '@/components/design/magnetic-button'
+import { LoadingState } from '@/components/async-state/loading-state'
+import { EmptyState } from '@/components/async-state/empty-state'
 import { productApi } from '@/lib/api'
 import type { Product } from '@/types'
 
@@ -18,7 +23,6 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
-  // 从接口返回的商品数据中提取真实分类，保证与后端同步
   const categoryTags = Array.from(new Set(products.map(p => p.categoryName).filter((name): name is string => Boolean(name))))
 
   useEffect(() => {
@@ -26,7 +30,7 @@ export default function ProductsPage() {
       try {
         setIsLoading(true)
         const result = await productApi.getList()
-        const allProducts = result.data || result || []
+        const allProducts = result || []
         setProducts(allProducts)
       } catch (error) {
         console.error('加载商品失败:', error)
@@ -46,111 +50,118 @@ export default function ProductsPage() {
     : products.filter(p => p.categoryName === selectedCategory)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-orange-50">
+    <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h1 className="text-4xl font-bold text-center mb-4">
-            <span className="bg-gradient-to-r from-pink-500 to-orange-500 bg-clip-text text-transparent">
-              商品列表
-            </span>
+      <main className="container mx-auto px-4 py-12 sm:py-16">
+        <ScrollReveal className="text-center mb-12">
+          <TextShimmer className="text-sm font-medium tracking-wider uppercase mb-4" as="span">
+            精选好物
+          </TextShimmer>
+          <h1 className="text-4xl md:text-5xl font-serif font-semibold mb-4 tracking-tight">
+            发现美味零食
           </h1>
-          <p className="text-center text-gray-600 mb-12 text-lg">
-            精选 {products.length} 款美味零食
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            精选 {products.length} 款美味零食，每一口都是惊喜
           </p>
-        </motion.div>
+        </ScrollReveal>
 
         {/* 分类筛选 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          className="mb-8 flex flex-wrap gap-3 justify-center"
-        >
-          <Badge
-            className={`cursor-pointer px-4 py-2 text-sm ${
-              selectedCategory === 'all' 
-                ? 'bg-gradient-to-r from-pink-500 to-orange-500 text-white' 
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-            onClick={() => setSelectedCategory('all')}
-          >
-            全部
-          </Badge>
-          {categoryTags.map((category) => (
-            <Badge
-              key={category}
-              className={`cursor-pointer px-4 py-2 text-sm ${
-                selectedCategory === category
-                  ? 'bg-gradient-to-r from-pink-500 to-orange-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setSelectedCategory(category)}
+        <ScrollReveal delay={0.1} className="mb-10">
+          <div className="flex flex-wrap gap-3 justify-center">
+            <Button
+              variant={selectedCategory === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedCategory('all')}
+              className={selectedCategory === 'all'
+                ? 'rounded-full bg-white text-foreground border-foreground/20 hover:bg-accent hover:text-accent-foreground'
+                : 'rounded-full glass hover:bg-white/50 hover:text-foreground hover:border-foreground/20'
+              }
             >
-              {category}
-            </Badge>
-          ))}
-        </motion.div>
+              全部
+            </Button>
+            {categoryTags.map((category) => (
+              <Button
+                key={category}
+                variant={selectedCategory === category ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory(category)}
+                className={selectedCategory === category
+                  ? 'rounded-full bg-white text-foreground border-foreground/20 hover:bg-accent hover:text-accent-foreground'
+                  : 'rounded-full glass hover:bg-white/50 hover:text-foreground hover:border-foreground/20'
+                }
+              >
+                {category}
+              </Button>
+            ))}
+          </div>
+        </ScrollReveal>
 
         {/* 商品网格 */}
         {isLoading ? (
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <Card key={i} className="p-6">
-                <Skeleton className="w-full aspect-square mb-4" />
-                <Skeleton className="h-4 w-3/4 mb-2" />
+          <LoadingState className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} className="p-5 glass border-border/50 rounded-2xl">
+                <Skeleton className="w-full aspect-square mb-4 rounded-xl" />
+                <Skeleton className="h-5 w-3/4 mb-3" />
                 <Skeleton className="h-4 w-1/2" />
               </Card>
             ))}
-          </div>
+          </LoadingState>
         ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-20">
-            <Package className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-600 text-lg">暂无商品</p>
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05, duration: 0.5 }}
-                whileHover={{ y: -8 }}
-                onClick={() => handleProductClick(product.id)}
-                className="cursor-pointer"
+          <EmptyState
+            icon={<Package className="h-10 w-10 text-primary/60" />}
+            title="暂无商品"
+            action={
+              <Button
+                onClick={() => router.push('/recognize')}
+                className="bg-white text-foreground border-foreground/20 hover:bg-accent hover:text-accent-foreground"
               >
-                <Card className="p-6 h-full backdrop-blur-sm bg-white/80 border-0 shadow-lg hover:shadow-2xl transition-all duration-300">
-                  <div className="aspect-square bg-gradient-to-br from-pink-100 to-orange-100 rounded-lg mb-4 flex items-center justify-center">
-                    <Package className="h-16 w-16 text-gray-400" />
-                  </div>
-                  <h3 className="font-semibold mb-2 line-clamp-2">{product.name}</h3>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl font-bold text-primary">¥{product.price}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      库存 {product.stock}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-gray-500 mb-3">销量: {product.sales}</p>
-                  <Button 
-                    className="w-full bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleProductClick(product.id)
-                    }}
-                  >
-                    <ShoppingBag className="mr-2 h-4 w-4" />
-                    查看详情
-                  </Button>
-                </Card>
-              </motion.div>
+                去拍照识别
+              </Button>
+            }
+          />
+        ) : (
+          <StaggerContainer className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {filteredProducts.map((product) => (
+              <StaggerItem key={product.id}>
+                <motion.div
+                  whileHover={{ y: -8, transition: { duration: 0.2 } }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleProductClick(product.id)}
+                  className="cursor-pointer h-full group"
+                >
+                  <Card className="p-5 h-full glass border-border/50 rounded-2xl hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden">
+                    <div className="aspect-square bg-gradient-to-br from-primary/10 to-accent/10 rounded-xl mb-5 flex items-center justify-center relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <Package className="h-16 w-16 text-primary/40 group-hover:scale-110 group-hover:text-primary/60 transition-all duration-300" />
+                    </div>
+                    <h3 className="font-semibold mb-3 line-clamp-2 text-foreground group-hover:text-primary transition-colors">
+                      {product.name}
+                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-2xl font-bold text-primary">¥{product.price}</span>
+                      <Badge variant="secondary" className="text-xs glass">
+                        库存 {product.stock}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">销量: {product.sales}</p>
+                    <MagneticButton
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleProductClick(product.id)
+                      }}
+                      className="w-full h-10 text-sm font-medium bg-white text-foreground border border-foreground/20 hover:bg-accent hover:text-accent-foreground shadow-sm"
+                    >
+                      <ShoppingBag className="mr-2 h-4 w-4" />
+                      查看详情
+                      <ArrowRight className="ml-1 h-3.5 w-3.5 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                    </MagneticButton>
+                  </Card>
+                </motion.div>
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerContainer>
         )}
       </main>
     </div>

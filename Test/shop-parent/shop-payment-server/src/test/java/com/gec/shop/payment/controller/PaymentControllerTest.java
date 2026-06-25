@@ -7,7 +7,7 @@ import com.gec.shop.order.pojo.Order;
 import com.gec.shop.payment.feign.OrderFeignClient;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.gec.shop.payment.mapper.PaymentMapper;
-import com.gec.shop.payment.util.RedisLockUtil;
+import com.gec.shop.common.util.RedisLockUtil;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +17,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Map;
 
@@ -69,7 +70,7 @@ class PaymentControllerTest {
         order.setId(orderId);
         order.setUid(1L);
         order.setStatus("WAIT_PAY");
-        order.setProductPrice(10.0);
+        order.setProductPrice(new BigDecimal("10.00"));
         order.setNumber(2);
         return order;
     }
@@ -91,13 +92,13 @@ class PaymentControllerTest {
 
         Map<String, Object> firstResult = paymentController.pay(orderId);
         assertEquals(200, firstResult.get("code"));
-        assertEquals("payment success", firstResult.get("msg"));
+        assertEquals("支付成功", firstResult.get("msg"));
         assertEquals(1L, paymentMapper.selectCount(Wrappers.emptyWrapper()));
 
         order.setStatus("PAID");
         Map<String, Object> secondResult = paymentController.pay(orderId);
         assertEquals(200, secondResult.get("code"));
-        assertEquals("order already paid, please do not repeat", secondResult.get("msg"));
+        assertEquals("订单已支付，请勿重复支付", secondResult.get("msg"));
         assertEquals(1L, paymentMapper.selectCount(Wrappers.emptyWrapper()), "重复支付不应新增支付记录");
     }
 
@@ -149,7 +150,7 @@ class PaymentControllerTest {
         Map<String, Object> result = paymentController.pay(orderId);
 
         assertEquals(429, result.get("code"));
-        assertTrue(((String) result.get("msg")).contains("order is paying"));
+        assertTrue(((String) result.get("msg")).contains("订单正在支付中"));
         assertEquals(0L, paymentMapper.selectCount(Wrappers.emptyWrapper()), "锁失败时不应产生支付记录");
     }
 
@@ -160,7 +161,7 @@ class PaymentControllerTest {
     void shouldCalculatePaymentAmountCorrectly() {
         Long orderId = 5L;
         Order order = buildWaitPayOrder(orderId);
-        order.setProductPrice(12.5);
+        order.setProductPrice(new BigDecimal("12.50"));
         order.setNumber(3);
 
         when(orderFeignClient.getById(orderId)).thenReturn(order);

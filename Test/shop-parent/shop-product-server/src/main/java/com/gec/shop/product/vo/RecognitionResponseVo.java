@@ -1,6 +1,7 @@
 package com.gec.shop.product.vo;
 
 import com.gec.shop.product.feign.dto.DetectionDto;
+import com.gec.shop.product.feign.dto.ImageDimensionsDto;
 import com.gec.shop.product.pojo.Product;
 import lombok.Data;
 
@@ -21,4 +22,5 @@ public class RecognitionResponseVo implements Serializable {
     private List<DetectionDto> detections;
     private Integer detectedCount;
     private String categoryName;
+    private ImageDimensionsDto imageDimensions;
 }

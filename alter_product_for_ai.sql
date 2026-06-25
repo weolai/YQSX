@@ -23,15 +23,43 @@ CREATE TABLE IF NOT EXISTS `t_product_category` (
   KEY `idx_status_sort` (`status`, `sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品类别表';
 
--- 2. 商品表增加 AI 识别所需字段
-ALTER TABLE `t_product`
-  ADD COLUMN IF NOT EXISTS `category_id` bigint DEFAULT NULL COMMENT '商品类别ID' AFTER `stock`,
-  ADD COLUMN IF NOT EXISTS `image_url` varchar(500) DEFAULT NULL COMMENT '商品图片URL' AFTER `category_id`,
-  ADD COLUMN IF NOT EXISTS `sales` int DEFAULT 0 COMMENT '销量' AFTER `image_url`,
-  ADD COLUMN IF NOT EXISTS `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间' AFTER `sales`,
-  ADD COLUMN IF NOT EXISTS `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间' AFTER `create_time`,
-  ADD KEY IF NOT EXISTS `idx_category_id` (`category_id`),
-  ADD KEY IF NOT EXISTS `idx_sales` (`sales`);
+-- 2. 商品表增加 AI 识别所需字段（幂等，兼容 MySQL 5.7+）
+-- MySQL 5.7 不支持 ADD COLUMN IF NOT EXISTS，使用 information_schema 判断
+
+-- 2.1 添加 category_id 字段
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_product' AND COLUMN_NAME = 'category_id');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE `shop-product`.`t_product` ADD COLUMN `category_id` bigint DEFAULT NULL COMMENT \'商品类别ID\' AFTER `stock`', 'SELECT \'category_id exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2.2 添加 image_url 字段
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_product' AND COLUMN_NAME = 'image_url');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE `shop-product`.`t_product` ADD COLUMN `image_url` varchar(500) DEFAULT NULL COMMENT \'商品图片URL\' AFTER `category_id`', 'SELECT \'image_url exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2.3 添加 sales 字段
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_product' AND COLUMN_NAME = 'sales');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE `shop-product`.`t_product` ADD COLUMN `sales` int DEFAULT 0 COMMENT \'销量\' AFTER `image_url`', 'SELECT \'sales exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2.4 添加 create_time 字段
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_product' AND COLUMN_NAME = 'create_time');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE `shop-product`.`t_product` ADD COLUMN `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT \'创建时间\' AFTER `sales`', 'SELECT \'create_time exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2.5 添加 update_time 字段
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_product' AND COLUMN_NAME = 'update_time');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE `shop-product`.`t_product` ADD COLUMN `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT \'更新时间\' AFTER `create_time`', 'SELECT \'update_time exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2.6 添加 idx_category_id 索引
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_product' AND INDEX_NAME = 'idx_category_id');
+SET @sql = IF(@idx_exists = 0, 'ALTER TABLE `shop-product`.`t_product` ADD KEY `idx_category_id` (`category_id`)', 'SELECT \'idx_category_id exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2.7 添加 idx_sales 索引
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_product' AND INDEX_NAME = 'idx_sales');
+SET @sql = IF(@idx_exists = 0, 'ALTER TABLE `shop-product`.`t_product` ADD KEY `idx_sales` (`sales`)', 'SELECT \'idx_sales exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- 3. 新建 AI 识别日志表
 CREATE TABLE IF NOT EXISTS `t_recognition_log` (
@@ -113,11 +141,20 @@ ON DUPLICATE KEY UPDATE
   `image_url` = VALUES(`image_url`),
   `sales` = VALUES(`sales`);
 
--- 6. 添加外键约束（确保数据一致性）
--- 注意：若外键已存在，请先手动删除后再执行
-ALTER TABLE `t_product`
-  ADD CONSTRAINT `fk_product_category` FOREIGN KEY (`category_id`) REFERENCES `t_product_category` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+-- 6. 添加外键约束（幂等，兼容 MySQL 5.7+）
+-- MySQL 不支持 ADD CONSTRAINT IF NOT EXISTS，使用 information_schema 判断
 
-ALTER TABLE `t_recognition_log`
-  ADD CONSTRAINT `fk_recognition_category` FOREIGN KEY (`recognized_category_id`) REFERENCES `t_product_category` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_recognition_product` FOREIGN KEY (`top_product_id`) REFERENCES `t_product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+-- 6.1 t_product -> t_product_category 外键
+SET @fk_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_product' AND CONSTRAINT_NAME = 'fk_product_category' AND CONSTRAINT_TYPE = 'FOREIGN KEY');
+SET @sql = IF(@fk_exists = 0, 'ALTER TABLE `shop-product`.`t_product` ADD CONSTRAINT `fk_product_category` FOREIGN KEY (`category_id`) REFERENCES `t_product_category` (`id`) ON DELETE SET NULL ON UPDATE CASCADE', 'SELECT \'fk_product_category exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 6.2 t_recognition_log -> t_product_category 外键
+SET @fk_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_recognition_log' AND CONSTRAINT_NAME = 'fk_recognition_category' AND CONSTRAINT_TYPE = 'FOREIGN KEY');
+SET @sql = IF(@fk_exists = 0, 'ALTER TABLE `shop-product`.`t_recognition_log` ADD CONSTRAINT `fk_recognition_category` FOREIGN KEY (`recognized_category_id`) REFERENCES `t_product_category` (`id`) ON DELETE SET NULL ON UPDATE CASCADE', 'SELECT \'fk_recognition_category exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 6.3 t_recognition_log -> t_product 外键
+SET @fk_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = 'shop-product' AND TABLE_NAME = 't_recognition_log' AND CONSTRAINT_NAME = 'fk_recognition_product' AND CONSTRAINT_TYPE = 'FOREIGN KEY');
+SET @sql = IF(@fk_exists = 0, 'ALTER TABLE `shop-product`.`t_recognition_log` ADD CONSTRAINT `fk_recognition_product` FOREIGN KEY (`top_product_id`) REFERENCES `t_product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE', 'SELECT \'fk_recognition_product exists\' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

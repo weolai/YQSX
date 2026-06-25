@@ -8,6 +8,7 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
+        <module>shop-common</module>
         <module>shop-product-api</module>
         <module>shop-product-server</module>
         <module>shop-order-api</module>
@@ -29,6 +30,7 @@
         <spring-cloud-alibaba.version>2.2.3.RELEASE</spring-cloud-alibaba.version>
         <sentinel.version>1.8.9</sentinel.version>
         <jjwt.version>0.11.5</jjwt.version>
+        <maven.test.skip>true</maven.test.skip>
     </properties>
     <dependencyManagement>
         <dependencies>

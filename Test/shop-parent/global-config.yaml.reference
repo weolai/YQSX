@@ -1,0 +1,20 @@
+# 全局共享配置（在 Nacos 配置中心创建 data-id=global-config.yaml）
+# 本文件作为参考模板，实际运行时从 Nacos 读取
+#
+# 安全说明：
+# 1. jwt.secret 必须为 >= 32 字节的随机字符串，生产环境务必修改
+# 2. 数据库密码使用各服务独立账号，最小权限
+# 3. 此文件不应包含明文生产密码，生产环境通过 Nacos 加密配置或环境变量注入
+
+jwt:
+  # JWT 密钥（开发环境默认值，生产环境必须覆盖）
+  # 生成方式：openssl rand -base64 48
+  secret: dev-only-jwt-secret-key-please-change-in-prod-32bytes
+
+# 数据库连接配置（各服务通过 ${spring.application.name} 区分）
+# 生产环境建议：
+#   - 每个服务使用独立账号，仅授予对应数据库的 DML 权限
+#   - 启用 SSL：useSSL=true&requireSSL=true
+#   - 禁用 allowPublicKeyRetrieval
+db:
+  common-params: serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8

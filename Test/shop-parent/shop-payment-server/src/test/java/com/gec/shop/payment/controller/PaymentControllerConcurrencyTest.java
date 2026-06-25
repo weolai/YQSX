@@ -15,6 +15,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -69,7 +70,7 @@ class PaymentControllerConcurrencyTest {
         order.setId(orderId);
         order.setUid(1L);
         order.setStatus("WAIT_PAY");
-        order.setProductPrice(10.0);
+        order.setProductPrice(new BigDecimal("10.00"));
         order.setNumber(2);
 
         when(orderFeignClient.getById(orderId)).thenReturn(order);
@@ -93,9 +94,9 @@ class PaymentControllerConcurrencyTest {
                     startLatch.await();
                     Map<String, Object> result = paymentController.pay(orderId);
                     int code = (int) result.get("code");
-                    if (code == 200 && "payment success".equals(result.get("msg"))) {
+                    if (code == 200 && "支付成功".equals(result.get("msg"))) {
                         successCount.incrementAndGet();
-                    } else if (code == 429 && String.valueOf(result.get("msg")).contains("order is paying")) {
+                    } else if (code == 429 && String.valueOf(result.get("msg")).contains("订单正在支付中")) {
                         lockedCount.incrementAndGet();
                     }
                 } catch (Exception e) {

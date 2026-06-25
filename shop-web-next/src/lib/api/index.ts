@@ -1,5 +1,5 @@
 import request from './request'
-import type { LoginResponse, UserInfo, Product, RecognitionResponse, Order, OrderCreateResponse, PaymentResponse } from '@/types'
+import type { LoginResponse, RegisterResponse, ResetPasswordResponse, SendCodeResponse, UserInfo, Product, RecognitionResponse, Order, OrderCreateResponse, PaymentResponse, DinRecommendItem } from '@/types'
 
 // 认证接口
 export const authApi = {
@@ -11,6 +11,21 @@ export const authApi = {
   // 获取当前用户
   getCurrentUser: () => {
     return request.get<UserInfo>('/user/current')
+  },
+
+  // 发送短信验证码
+  sendCode: (phone: string, type: 'REGISTER' | 'RESET_PASSWORD') => {
+    return request.post<SendCodeResponse>('/user/send-code', { phone, type })
+  },
+
+  // 手机号验证码注册
+  register: (data: { phone: string; code: string; username: string; password: string; nickname?: string }) => {
+    return request.post<RegisterResponse>('/user/register', data)
+  },
+
+  // 手机号验证码重置密码
+  resetPassword: (data: { phone: string; code: string; newPassword: string }) => {
+    return request.post<ResetPasswordResponse>('/user/reset-password', data)
   }
 }
 
@@ -42,11 +57,23 @@ export const productApi = {
     if (uid) {
       formData.append('uid', uid.toString())
     }
-    
+
     return request.post<RecognitionResponse>('/products/recognize', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 60000
     })
+  },
+
+  // DIN 个性化推荐
+  getDinRecommend: (userId: number, topK: number = 10) => {
+    return request.get<DinRecommendItem[]>('/products/recommend/din', {
+      params: { userId, topK }
+    })
+  },
+
+  // 获取样本用户列表
+  getSampleUsers: () => {
+    return request.get<number[]>('/products/recommend/users')
   }
 }
 

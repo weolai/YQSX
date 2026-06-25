@@ -2,6 +2,7 @@ package com.gec.shop.gateway.controller;
 
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,7 +15,9 @@ import java.util.stream.Collectors;
 
 /**
  * DiscoveryClient 手动服务发现演示接口。
+ * 仅在 dev/test profile 下加载，生产环境不暴露
  */
+@Profile({"dev", "test"})
 @RestController
 @RequestMapping("/api/discovery")
 public class DiscoveryController {

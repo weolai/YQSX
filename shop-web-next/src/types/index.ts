@@ -16,6 +16,25 @@ export interface LoginResponse {
   username: string
 }
 
+export interface RegisterResponse {
+  code: number
+  msg: string
+  token?: string
+  userId?: number
+  username?: string
+}
+
+export interface ResetPasswordResponse {
+  code: number
+  msg: string
+}
+
+export interface SendCodeResponse {
+  code: number
+  msg: string
+  verifyCode?: string
+}
+
 export interface UserInfo {
   userId: number
   username: string
@@ -48,6 +67,11 @@ export interface Detection {
   boundingBox: BoundingBox
 }
 
+export interface ImageDimensions {
+  width: number
+  height: number
+}
+
 export interface RecognitionResponse {
   status: string
   message: string
@@ -56,6 +80,7 @@ export interface RecognitionResponse {
   detectedCount: number
   products: Product[]
   categoryName?: string
+  imageDimensions?: ImageDimensions
 }
 
 // 订单相关
@@ -83,4 +108,18 @@ export interface PaymentResponse {
   msg: string
   orderId: number
   orderUpdateResult: string
+}
+
+// DIN 推荐相关
+export interface DinRecommendItem {
+  itemId: number
+  itemCategory: number
+  displayName: string
+  displayImage: string
+  score: number
+  pvCount: number
+  cartCount: number
+  favCount: number
+  buyCount: number
+  popularityScore: number
 }

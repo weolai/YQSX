@@ -1,6 +1,6 @@
 package com.gec.shop.gateway.filter;
 
-import com.gec.shop.gateway.util.JwtUtil;
+import com.gec.shop.common.util.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +37,9 @@ public class AuthFilter implements GlobalFilter, Ordered {
     @Autowired
     private Tracer tracer;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
@@ -52,12 +55,12 @@ public class AuthFilter implements GlobalFilter, Ordered {
             return unauthorized(exchange.getResponse(), "请先登录");
         }
 
-        if (!JwtUtil.validateToken(token)) {
+        if (!jwtUtil.validateToken(token)) {
             log.warn("Token 校验失败: path={}", path);
             return unauthorized(exchange.getResponse(), "登录已过期或 Token 无效");
         }
 
-        Long userId = JwtUtil.getUserId(token);
+        Long userId = jwtUtil.getUserId(token);
         ServerHttpRequest mutatedRequest = request.mutate()
                 .header("X-User-Id", String.valueOf(userId))
                 .build();

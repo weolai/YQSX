@@ -4,6 +4,7 @@ import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.gec.shop.product.pojo.Product;
 import com.gec.shop.product.service.ProductService;
+import com.gec.shop.product.vo.DinRecommendVo;
 import com.gec.shop.product.vo.RecognitionResponseVo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("products")
@@ -31,7 +35,7 @@ public class ProductController {
         Product product = new Product();
         product.setId(pid);
         product.setName("商品查询繁忙，请稍后再试");
-        product.setPrice(0.0);
+        product.setPrice(BigDecimal.ZERO);
         return product;
     }
 
@@ -68,6 +72,38 @@ public class ProductController {
     }
 
     /**
+     * 基于 DIN 模型的个性化推荐
+     * 输入天池用户ID，返回推荐商品列表
+     */
+    @GetMapping("/recommend/din")
+    @SentinelResource(value = "product.recommendDin", blockHandler = "recommendDinBlockHandler")
+    public List<DinRecommendVo> recommendByDin(@RequestParam Long userId,
+                                                @RequestParam(value = "topK", defaultValue = "10") Integer topK) {
+        log.info("收到 DIN 推荐请求, userId={}, topK={}", userId, topK);
+        return productService.recommendByDin(userId, topK);
+    }
+
+    public List<DinRecommendVo> recommendDinBlockHandler(Long userId, Integer topK, BlockException e) {
+        log.warn("DIN 推荐被限流: userId={}, topK={}", userId, topK);
+        return Collections.emptyList();
+    }
+
+    /**
+     * 获取样本用户ID列表 (行为最丰富的用户)
+     */
+    @GetMapping("/recommend/users")
+    @SentinelResource(value = "product.sampleUsers", blockHandler = "sampleUsersBlockHandler")
+    public List<Long> getSampleUsers() {
+        log.info("收到获取样本用户列表请求");
+        return productService.getSampleUserIds();
+    }
+
+    public List<Long> sampleUsersBlockHandler(BlockException e) {
+        log.warn("获取样本用户被限流");
+        return Collections.emptyList();
+    }
+
+    /**
      * 商品列表，支持按类别筛选
      */
     @GetMapping("/list")
@@ -78,5 +114,42 @@ public class ProductController {
 
     public List<Product> listBlockHandler(Long categoryId, BlockException e) {
         return null;
+    }
+
+    /**
+     * 批量查询商品名称（订单服务内部调用，解决 N+1 问题）
+     */
+    @GetMapping("/batchNames")
+    public Map<Long, String> batchGetNames(@RequestParam List<Long> ids) {
+        return productService.batchGetNames(ids);
+    }
+
+    /**
+     * 原子扣减库存（订单服务内部调用）
+     */
+    @PostMapping("/reduceStock")
+    @SentinelResource(value = "product.reduceStock", blockHandler = "reduceStockBlockHandler")
+    public boolean reduceStock(@RequestParam Long pid, @RequestParam Integer number) {
+        return productService.reduceStock(pid, number);
+    }
+
+    public boolean reduceStockBlockHandler(Long pid, Integer number, BlockException e) {
+        log.warn("库存扣减被限流: pid={}, number={}", pid, number);
+        return false;
+    }
+
+    /**
+     * 补偿回滚库存（订单服务内部调用）
+     */
+    @PostMapping("/rollbackStock")
+    @SentinelResource(value = "product.rollbackStock", blockHandler = "rollbackStockBlockHandler")
+    public boolean rollbackStock(@RequestParam Long pid, @RequestParam Integer number) {
+        productService.rollbackStock(pid, number);
+        return true;
+    }
+
+    public boolean rollbackStockBlockHandler(Long pid, Integer number, BlockException e) {
+        log.error("库存回滚被限流,需人工补偿: pid={}, number={}", pid, number);
+        return false;
     }
 }

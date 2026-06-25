@@ -5,21 +5,19 @@ import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.gec.shop.order.dto.OrderCreateDTO;
 import com.gec.shop.order.pojo.Order;
 import com.gec.shop.order.config.TraceConfig;
-import com.gec.shop.order.feign.IProductFeignService;
 import com.gec.shop.order.service.OrderService;
-import com.gec.shop.order.util.RedisLockUtil;
-import com.gec.shop.product.pojo.Product;
+import com.gec.shop.common.util.RedisLockUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/orders")
@@ -32,39 +30,7 @@ public class OrderController {
     private RedisLockUtil redisLockUtil;
 
     @Autowired
-    private IProductFeignService productFeignService;
-
-    @Autowired
     private TraceConfig traceConfig;
-
-    @GetMapping("/test-product/{pid}")
-    public Product testProduct(@PathVariable Long pid) {
-        return productFeignService.get(pid);
-    }
-
-    @GetMapping("/test-create/{pid}/{uid}")
-    public Order testCreate(@PathVariable Long pid, @PathVariable Long uid) {
-        return orderService.createOrder(pid, uid);
-    }
-
-    @GetMapping("/test-save/{pid}/{uid}")
-    @SentinelResource(value = "order.testSave", blockHandler = "testSaveBlockHandler")
-    public Order testSave(@PathVariable Long pid, @PathVariable Long uid) {
-        String lockKey = "order:dedup:" + uid + ":" + pid;
-        String lockValue = Thread.currentThread().getId() + "-" + System.nanoTime();
-        boolean locked = redisLockUtil.tryLock(lockKey, lockValue, 10);
-        if (!locked) {
-            Order order = new Order();
-            order.setId(-1L);
-            order.setStatus("DUPLICATE");
-            return order;
-        }
-        try {
-            return orderService.createOrder(pid, uid);
-        } finally {
-            redisLockUtil.unlock(lockKey, lockValue);
-        }
-    }
 
     @PostMapping("/save")
     @SentinelResource(value = "order.create", blockHandler = "createOrderBlockHandler")
@@ -90,7 +56,7 @@ public class OrderController {
                     return existOrder;
                 }
             }
-            return orderService.createOrder(dto.getPid(), dto.getUid());
+            return orderService.createOrder(dto.getPid(), dto.getUid(), dto.getNumber());
         } finally {
             redisLockUtil.unlock(lockKey, lockValue);
         }
@@ -110,7 +76,15 @@ public class OrderController {
 
     @PostMapping("/updateStatus")
     @SentinelResource(value = "order.updateStatus", blockHandler = "updateStatusBlockHandler")
-    public String updateStatus(@RequestParam Long id, @RequestParam String status) {
+    public String updateStatus(@RequestParam Long id,
+                               @RequestParam String status,
+                               @RequestHeader(value = "X-Internal-Call", required = false) String internalCall,
+                               @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        // 授权校验：仅允许内部服务调用（如支付服务回调）
+        // 外部请求不允许直接修改订单状态，防止绕过支付
+        if (!"true".equals(internalCall)) {
+            throw new RuntimeException("无权限修改订单状态，该接口仅限内部服务调用");
+        }
         int rows = orderService.updateStatus(id, status);
         return rows > 0 ? "success" : "fail";
     }
@@ -142,15 +116,7 @@ public class OrderController {
         return java.util.Collections.singletonList(order);
     }
 
-    public String updateStatusBlockHandler(Long id, String status, BlockException e) {
+    public String updateStatusBlockHandler(Long id, String status, String internalCall, String userId, BlockException e) {
         return "BLOCKED: 订单状态更新繁忙，请稍后再试";
-    }
-
-    public Order testSaveBlockHandler(Long pid, Long uid, BlockException e) {
-        Order order = new Order();
-        order.setId(-1L);
-        order.setStatus("BLOCKED");
-        order.setProductName("test-save 限流");
-        return order;
     }
 }

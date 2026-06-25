@@ -7,9 +7,9 @@ import com.netflix.loadbalancer.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 /**
  * 自定义 Ribbon 负载均衡规则：
@@ -37,10 +37,16 @@ public class VersionPriorityRule extends AbstractLoadBalancerRule {
             return null;
         }
 
-        List<Server> priorityServers = reachableServers.stream()
-                .filter(server -> server instanceof NacosServer)
-                .filter(server -> PRIORITY_VERSION.equals(((NacosServer) server).getMetadata().get(VERSION_KEY)))
-                .collect(Collectors.toList());
+        // for 循环替代 Stream，避免每次请求创建中间 pipeline 对象
+        List<Server> priorityServers = new ArrayList<>(reachableServers.size());
+        for (Server server : reachableServers) {
+            if (server instanceof NacosServer) {
+                NacosServer nacosServer = (NacosServer) server;
+                if (PRIORITY_VERSION.equals(nacosServer.getMetadata().get(VERSION_KEY))) {
+                    priorityServers.add(nacosServer);
+                }
+            }
+        }
 
         List<Server> targetServers = priorityServers.isEmpty() ? reachableServers : priorityServers;
 
@@ -49,10 +55,9 @@ public class VersionPriorityRule extends AbstractLoadBalancerRule {
 
         if (chosen instanceof NacosServer) {
             NacosServer nacosServer = (NacosServer) chosen;
-            log.info("Ribbon 选择实例: {}:{}, metadata: {}",
-                    nacosServer.getHost(), nacosServer.getPort(), nacosServer.getMetadata());
+            log.debug("Ribbon 选择实例: {}:{}", nacosServer.getHost(), nacosServer.getPort());
         } else {
-            log.info("Ribbon 选择实例: {}", chosen.getHostPort());
+            log.debug("Ribbon 选择实例: {}", chosen.getHostPort());
         }
 
         return chosen;
