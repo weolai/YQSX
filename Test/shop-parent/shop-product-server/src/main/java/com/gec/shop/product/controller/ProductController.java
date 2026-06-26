@@ -38,6 +38,8 @@ public class ProductController {
         return product;
     }
 
+    private static final long MAX_RECOGNIZE_FILE_SIZE = 10 * 1024 * 1024;
+
     /**
      * 拍照识别商品
      */
@@ -46,6 +48,32 @@ public class ProductController {
     public RecognitionResponseVo recognize(@RequestParam("file") MultipartFile file,
                                            @RequestParam(value = "uid", required = false) Long uid) {
         log.info("收到拍照识别请求, uid={}, fileName={}", uid, file.getOriginalFilename());
+
+        if (file == null || file.isEmpty()) {
+            log.warn("识别请求未上传文件, uid={}", uid);
+            RecognitionResponseVo response = new RecognitionResponseVo();
+            response.setStatus("error");
+            response.setMessage("请上传图片文件");
+            return response;
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            log.warn("识别请求文件类型非法, uid={}, contentType={}", uid, contentType);
+            RecognitionResponseVo response = new RecognitionResponseVo();
+            response.setStatus("error");
+            response.setMessage("仅支持上传图片文件");
+            return response;
+        }
+
+        if (file.getSize() > MAX_RECOGNIZE_FILE_SIZE) {
+            log.warn("识别请求文件过大, uid={}, size={}", uid, file.getSize());
+            RecognitionResponseVo response = new RecognitionResponseVo();
+            response.setStatus("error");
+            response.setMessage("图片大小不能超过 10MB");
+            return response;
+        }
+
         return productService.recognize(file, uid);
     }
 

@@ -1,9 +1,9 @@
 # YQSX 智能零食商城
 
-> 基于 Spring Cloud Alibaba + Vue 3 + YOLOv11 的企业级 AI 智能购物平台
+> 基于 Spring Cloud Alibaba + Next.js + YOLOv11 的企业级 AI 智能购物平台
 
 ![项目状态](https://img.shields.io/badge/完成度-80%25-green)
-![技术栈](https://img.shields.io/badge/技术栈-Spring%20Cloud%20|%20Vue3%20|%20YOLO-blue)
+![技术栈](https://img.shields.io/badge/技术栈-Spring%20Cloud%20|%20Next.js%20|%20YOLO-blue)
 
 ---
 
@@ -15,7 +15,7 @@ YQSX 智能零食商城是一个集成了 **AI 图像识别技术** 的现代化
 
 - 🤖 **AI 拍照识别**：YOLOv11 模型识别 19 类零食，准确率 98%+
 - 🏗️ **微服务架构**：Spring Cloud Alibaba 全家桶，可扩展、高可用
-- 🎨 **现代化前端**：Vue 3 + TypeScript + Element Plus，响应式设计
+- 🎨 **现代化前端**：Next.js 16 + React 19 + TypeScript + Tailwind CSS，响应式设计
 - 📊 **可观测性**：Zipkin 链路追踪 + Prometheus 指标 + Grafana 可视化
 - 🔒 **安全认证**：JWT Token + Gateway 统一认证 + Sentinel 限流
 
@@ -47,7 +47,7 @@ YOLOv11 模型识别
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    前端层 (Vue 3)                            │
+│                 前端层 (Next.js 16 :3000)                    │
 │  登录页 | 首页 | 商品列表 | AI识别 | 订单管理 | 用户中心      │
 └─────────────────────────────────────────────────────────────┘
                           ↓ HTTPS
@@ -112,12 +112,12 @@ YOLOv11 模型识别
 
 | 技术 | 版本 | 说明 |
 |-----|------|------|
-| Vue | 3.4+ | 前端框架 |
+| Next.js | 16+ | React 全栈框架 |
+| React | 19+ | 前端框架 |
 | TypeScript | 5.0+ | 类型系统 |
-| Vite | 5.0+ | 构建工具 |
-| Pinia | 2.1+ | 状态管理 |
-| Vue Router | 4.2+ | 路由管理 |
-| Element Plus | 2.5+ | UI 组件库 |
+| Tailwind CSS | 4+ | CSS 框架 |
+| Zustand | 5+ | 状态管理 |
+| shadcn/ui | 最新 | UI 组件库 |
 | Axios | 1.6+ | HTTP 客户端 |
 
 ---
@@ -136,15 +136,15 @@ YQSX/
 ├── XML/yolo_recognition_model/    # AI 识别模型
 │   └── recognition-service/       # 识别服务 :8086
 │
-├── shop-web/                      # 前端项目 :5173
+├── shop-web-next/                 # 前端项目 :3000 (Next.js 16)
 │   ├── src/
-│   │   ├── api/                   # API 接口
-│   │   ├── views/                 # 页面组件
+│   │   ├── app/                   # Next.js App Router
 │   │   ├── components/            # 公共组件
-│   │   ├── stores/                # Pinia 状态
-│   │   ├── router/                # 路由配置
-│   │   └── utils/                 # 工具函数
-│   └── package.json
+│   │   ├── lib/                   # 工具函数 / API / Stores
+│   │   └── types/                 # TypeScript 类型
+│   ├── public/
+│   ├── package.json
+│   └── next.config.ts
 │
 ├── docs/                          # 项目文档
 │   ├── README.md                  # 文档索引
@@ -221,32 +221,32 @@ cd XML/yolo_recognition_model/recognition-service
 python main.py
 ```
 
-### 第三步：启动前端项目
+### 第三步：启动 DIN 推荐服务
 
 ```bash
-# 创建前端项目（首次运行）
-npm create vite@latest shop-web -- --template vue-ts
-cd shop-web
+cd d:/Programming/YQSX
+.venv/Scripts/python.exe din_model.py --mode serve
+```
+
+### 第四步：启动前端项目
+
+```bash
+cd d:/Programming/YQSX/shop-web-next
 npm install
-
-# 安装依赖
-npm install element-plus @element-plus/icons-vue pinia vue-router@4 axios @vueuse/core dayjs
-npm install -D sass @types/node
-
-# 复制核心代码文件（参考 docs/frontend-quickstart.md）
-
-# 启动开发服务器
 npm run dev
 ```
 
-### 第四步：访问应用
+### 第五步：访问应用
 
 ```
-前端: http://localhost:5173
+前端: http://localhost:3000
 Gateway: http://localhost:8080
 Nacos: http://localhost:8848/nacos (用户名/密码: nacos/nacos)
 Zipkin: http://localhost:9411
-Grafana: http://localhost:3000
+Prometheus: http://localhost:9090
+Grafana: http://localhost:3001  (注意：使用 3001 避免与前端 3000 冲突)
+AI 识别: http://localhost:8086/health
+DIN 推荐: http://localhost:8000
 ```
 
 ### 测试账号
@@ -277,6 +277,7 @@ Grafana: http://localhost:3000
 - [API 规范](docs/api-standard.md) - 接口文档
 - [数据库设计](docs/database.md) - 表结构设计
 - [项目状态](docs/project-status.md) - 当前完成度 80%
+- [启动问题排查](docs/startup-troubleshooting.md) - 启动异常与修复方案
 
 ---
 
@@ -336,7 +337,10 @@ Minoo、Naderi、Lay's、Cheetos、Doritos 等 19 类
 
 ### Prometheus + Grafana 监控
 
-访问: http://localhost:3000
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3001
+
+> 注意：Grafana 默认端口 3000 与前端 Next.js 开发服务器冲突，本项目 Grafana 固定使用 3001。
 
 监控指标：
 - QPS/TPS
@@ -498,8 +502,8 @@ MIT License
 
 ---
 
-**项目版本**: v1.0.0  
-**最后更新**: 2026-06-22  
+**项目版本**: v1.0.1  
+**最后更新**: 2026-06-25  
 **项目完成度**: 80%  
 **文档完善度**: 95%
 

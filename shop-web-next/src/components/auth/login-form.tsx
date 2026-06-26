@@ -122,7 +122,7 @@ export function LoginForm({
         {displayLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            处理中...
+            正在登录...
           </>
         ) : (
           "登录"

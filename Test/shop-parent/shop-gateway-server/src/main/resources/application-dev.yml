@@ -1,0 +1,2 @@
+# dev profile 不再覆盖 Nacos 与路由配置
+# 恢复使用 Nacos 服务发现 + lb:// 负载均衡路由

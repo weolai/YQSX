@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
+import { OrderStatus } from '@/types'
 import { Navbar } from '@/components/layout/navbar'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -45,7 +48,7 @@ export default function ProductDetailPage() {
       } catch (error) {
         if (!controller.signal.aborted) {
           console.error('加载商品失败:', error)
-          setLoadError('加载商品失败，请刷新重试')
+          setLoadError('商品加载失败，请刷新后重试。')
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -64,18 +67,25 @@ export default function ProductDetailPage() {
     orderingRef.current = true
     setIsOrdering(true)
     try {
-      const orderResult = await orderApi.create(product.id, userInfo.userId)
-      const orderData = orderResult
+      const order = await orderApi.create(product.id, userInfo.userId)
 
-      const orderId = orderData.orderId || (orderData as unknown as { id?: number }).id
-      if (orderId) {
-        router.push(`/orders/${orderId}`)
+      // 后端返回完整 Order 实体；DUPLICATE 表示幂等返回已存在的待支付订单
+      if (
+        order.status === OrderStatus.WAIT_PAY ||
+        order.status === OrderStatus.PAID ||
+        order.status === OrderStatus.FINISHED ||
+        order.status === OrderStatus.DUPLICATE
+      ) {
+        toast.success('订单创建成功')
+        router.push(`/orders/${order.id}`)
+      } else if (order.status === OrderStatus.BLOCKED) {
+        toast.error('订单创建失败，请稍后重试。')
       } else {
-        alert(orderData.msg || '创建订单失败')
+        toast.error('订单创建失败，请稍后重试。')
       }
     } catch (error) {
       console.error('创建订单失败:', error)
-      alert('创建订单失败，请重试')
+      toast.error('订单创建失败，请稍后重试。')
     } finally {
       setIsOrdering(false)
       orderingRef.current = false
@@ -124,7 +134,7 @@ export default function ProductDetailPage() {
         <main className="container mx-auto px-4 py-12 sm:py-16">
           <EmptyState
             icon={<Package className="h-10 w-10 text-primary/60" />}
-            title="商品不存在"
+            title="商品不存在或已下架。"
             action={
               <Button
                 onClick={() => router.push('/products')}
@@ -168,9 +178,11 @@ export default function ProductDetailPage() {
                     <Package className="h-32 w-32 text-primary/40" />
                   </motion.div>
                   {product.imageUrl && (
-                    <img
+                    <Image
                       src={product.imageUrl}
                       alt={product.name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
                       className="absolute inset-0 w-full h-full object-cover"
                       onError={(e) => { e.currentTarget.style.display = 'none' }}
                     />
@@ -209,16 +221,15 @@ export default function ProductDetailPage() {
                   <span className="text-5xl font-serif font-semibold text-primary">¥{product.price}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>库存: {product.stock} 件</span>
-                  <span>已售: {product.sales} 件</span>
+                  <span>库存：{product.stock} 件</span>
+                  <span>已售：{product.sales} 件</span>
                 </div>
               </Card>
 
               <div>
                 <h2 className="font-semibold text-lg mb-3 text-foreground">商品介绍</h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  {product.name} 是一款优质零食，精选原料，口感醇厚。
-                  无论是自己享用还是分享给朋友，都是绝佳的选择。
+                  {product.name} 是一款适合日常休闲、办公室加餐和朋友分享的零食。你可以根据口味、价格和库存情况进行选择，也可以继续浏览系统推荐的相似商品。
                 </p>
               </div>
 
@@ -228,12 +239,12 @@ export default function ProductDetailPage() {
                 className="w-full h-14 text-lg font-semibold bg-white text-foreground border border-foreground/20 hover:bg-accent hover:text-accent-foreground shadow-lg shadow-black/10"
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                {isOrdering ? '创建订单中...' : product.stock === 0 ? '已售罄' : '立即购买'}
+                {isOrdering ? '正在创建订单...' : product.stock === 0 ? '已售罄' : '立即购买'}
               </MagneticButton>
 
               {!userInfo && (
                 <p className="text-sm text-muted-foreground text-center">
-                  登录后可立即购买，<Button variant="link" className="h-auto p-0 text-primary" onClick={() => router.push('/login')}>去登录</Button>
+                  登录后可购买，<Button variant="link" className="h-auto p-0 text-primary" onClick={() => router.push('/login')}>去登录</Button>
                 </p>
               )}
             </ScrollReveal>

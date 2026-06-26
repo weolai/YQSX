@@ -25,10 +25,10 @@ export default function Error({
       <div className="max-w-md w-full text-center space-y-6">
         <div className="space-y-2">
           <h2 className="text-2xl font-serif font-semibold text-foreground">
-            页面出错了
+            页面加载失败
           </h2>
           <p className="text-sm text-muted-foreground">
-            抱歉，页面加载时遇到问题。可以尝试重新加载，或返回首页继续浏览。
+            当前页面暂时无法正常显示，请重新加载，或返回首页继续浏览。
           </p>
         </div>
 
@@ -50,7 +50,7 @@ export default function Error({
             onClick={reset}
             className="rounded-full bg-white text-foreground border-foreground/20 hover:bg-accent hover:text-accent-foreground"
           >
-            重试
+            重新加载
           </Button>
           <Button
             variant="outline"

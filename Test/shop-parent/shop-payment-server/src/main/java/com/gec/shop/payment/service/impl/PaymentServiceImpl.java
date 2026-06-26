@@ -6,12 +6,12 @@ import com.gec.shop.payment.feign.OrderFeignClient;
 import com.gec.shop.payment.mapper.PaymentMapper;
 import com.gec.shop.payment.pojo.Payment;
 import com.gec.shop.payment.pojo.PaymentResult;
+import com.gec.shop.payment.service.PaymentInternalService;
 import com.gec.shop.payment.service.PaymentService;
 import com.gec.shop.common.util.RedisLockUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,10 +20,37 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 支付记录 Service 实现类
+ *
+ * 事务边界设计(Sprint 2 重构):
+ * 1. Redis 锁防重复支付(事务外, TTL=60s)
+ * 2. Feign 查询订单(事务外,避免长事务持有连接)
+ * 3. 本地事务仅覆盖支付记录写入(经由 PaymentInternalService 代理调用,事务生效)
+ * 4. Feign 更新订单状态(事务外)
+ *
+ * 补偿策略(Sprint 2 重构):
+ * - 订单状态更新 Feign 超时/异常: 不立即删除支付记录,标记为 PENDING_CONFIRM(status=4)
+ *   由定时任务 PaymentConfirmCompensateTask 扫描,查询订单真实状态后处理
+ * - 订单状态更新返回明确失败(非超时): 删除支付记录(经 PaymentInternalService REQUIRES_NEW 事务)
+ *
+ * 自调用问题修复:
+ * - save / compensateDeletePayment 抽取到 PaymentInternalService
+ * - PaymentServiceImpl 注入 PaymentInternalService,经由 Spring 代理调用,事务生效
  */
 @Slf4j
 @Service
 public class PaymentServiceImpl implements PaymentService {
+
+    /**
+     * 支付状态常量
+     */
+    private static final int STATUS_SUCCESS = 1;
+    private static final int STATUS_FAILED = 2;
+    private static final int STATUS_PENDING_CONFIRM = 4;
+
+    /**
+     * Redis 锁 TTL (Sprint 2: 60s,覆盖 Feign 链路,不引入看门狗)
+     */
+    private static final long LOCK_TTL_SECONDS = 60;
 
     @Autowired
     private PaymentMapper paymentMapper;
@@ -34,10 +61,13 @@ public class PaymentServiceImpl implements PaymentService {
     @Autowired
     private RedisLockUtil redisLockUtil;
 
+    @Autowired
+    private PaymentInternalService paymentInternalService;
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public boolean save(Payment payment) {
-        return paymentMapper.insert(payment) > 0;
+        // 委托给 PaymentInternalService,经由代理调用,事务生效
+        return paymentInternalService.save(payment);
     }
 
     @Override
@@ -52,13 +82,6 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * 处理支付流程
-     * 事务边界设计：
-     * 1. Redis 锁防重复支付（事务外）
-     * 2. Feign 查询订单（事务外，避免长事务持有连接）
-     * 3. 本地事务仅覆盖支付记录写入
-     * 4. Feign 更新订单状态（事务外，失败需补偿）
-     *
-     * 补偿策略：若订单状态更新失败，删除已写入的支付记录（最佳努力）
      */
     @Override
     public PaymentResult processPayment(Long orderId) {
@@ -79,10 +102,10 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     /**
-     * 尝试获取分布式锁
+     * 尝试获取分布式锁(TTL=60s)
      */
     private boolean tryAcquireLock(String lockKey, String lockValue) {
-        return redisLockUtil.tryLock(lockKey, lockValue, 30);
+        return redisLockUtil.tryLock(lockKey, lockValue, LOCK_TTL_SECONDS);
     }
 
     /**
@@ -96,7 +119,8 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         Payment payment = createPayment(order);
-        if (!save(payment)) {
+        // 经由 PaymentInternalService 代理调用,事务生效
+        if (!paymentInternalService.save(payment)) {
             return PaymentResult.of(500, "支付记录保存失败", orderId);
         }
 
@@ -104,7 +128,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     /**
-     * 校验订单存在性与可支付状态，校验通过返回 null，否则返回错误结果
+     * 校验订单存在性与可支付状态
      */
     private PaymentResult validateOrder(Order order, Long orderId) {
         if (order == null) {
@@ -120,20 +144,27 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     /**
-     * 更新订单状态为 PAID，Feign 调用失败或返回非 success 时补偿删除支付记录
+     * 更新订单状态为 PAID
+     *
+     * 补偿策略(Sprint 2):
+     * - Feign 超时/异常: 标记支付记录为 PENDING_CONFIRM,由定时任务处理(不立即删除)
+     * - Feign 返回明确失败: 删除支付记录(REQUIRES_NEW 独立事务)
      */
     private PaymentResult updateOrderStatusOrCompensate(Long orderId, Payment payment) {
         String updateResult;
         try {
             updateResult = orderFeignClient.updateStatus(orderId, "PAID");
         } catch (Exception e) {
-            log.error("订单状态更新失败，补偿删除支付记录: orderId={}, paymentId={}", orderId, payment.getId(), e);
-            compensateDeletePayment(payment.getId());
-            return PaymentResult.of(500, "订单状态更新失败，支付已回滚", orderId);
+            // Feign 超时/网络异常:订单可能已更新成功,不可贸然删除支付记录
+            // 标记为 PENDING_CONFIRM,由定时任务查询订单真实状态后处理
+            log.error("订单状态更新异常,标记支付记录为待确认: orderId={}, paymentId={}", orderId, payment.getId(), e);
+            markPaymentPendingConfirm(payment.getId());
+            return PaymentResult.of(500, "订单状态更新超时，支付待确认", orderId);
         }
         if (!"success".equals(updateResult)) {
+            // Feign 返回明确失败(订单状态已变更等):删除支付记录
             log.error("订单状态更新失败: orderId={}, result={}", orderId, updateResult);
-            compensateDeletePayment(payment.getId());
+            paymentInternalService.compensateDeletePayment(payment.getId());
             return PaymentResult.of(500, "订单状态更新失败: " + updateResult, orderId);
         }
         return PaymentResult.success(orderId, payment.getId(), updateResult);
@@ -141,18 +172,16 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * 创建支付记录
-     * 金额计算使用 BigDecimal 全程，避免 Double 精度丢失
      */
     private Payment createPayment(Order order) {
         Payment payment = new Payment();
         payment.setOrderId(order.getId());
         payment.setUserId(order.getUid());
-        // 实体类已改为 BigDecimal，直接使用避免精度转换
         BigDecimal unitPrice = order.getProductPrice();
         BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(order.getNumber()));
         payment.setAmount(amount);
         payment.setPayType(1);
-        payment.setStatus(1);
+        payment.setStatus(STATUS_SUCCESS);
         payment.setTransactionNo(generateTransactionNo());
         payment.setPayTime(LocalDateTime.now());
         payment.setRemark("支付成功");
@@ -160,8 +189,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     /**
-     * 生成交易流水号：PAY + yyyyMMddHHmmss + 6位随机数
-     * 数据库唯一索引兜底，防止并发重复
+     * 生成交易流水号
      */
     private String generateTransactionNo() {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
@@ -170,15 +198,19 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     /**
-     * 补偿删除支付记录（订单状态更新失败时调用）
+     * 标记支付记录为待确认状态(PENDING_CONFIRM)
+     * 用于 Feign 超时场景,定时任务扫描后处理
      */
-    @Transactional(rollbackFor = Exception.class)
-    public void compensateDeletePayment(Long paymentId) {
+    private void markPaymentPendingConfirm(Long paymentId) {
         try {
-            paymentMapper.deleteById(paymentId);
-            log.info("补偿删除支付记录成功: paymentId={}", paymentId);
+            Payment update = new Payment();
+            update.setId(paymentId);
+            update.setStatus(STATUS_PENDING_CONFIRM);
+            update.setRemark("订单状态更新超时，待确认");
+            paymentMapper.updateById(update);
+            log.info("支付记录已标记为待确认: paymentId={}", paymentId);
         } catch (Exception e) {
-            log.error("补偿删除支付记录失败，需人工处理: paymentId={}", paymentId, e);
+            log.error("标记支付记录为待确认失败,需人工处理: paymentId={}", paymentId, e);
         }
     }
 }

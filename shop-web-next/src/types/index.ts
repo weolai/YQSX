@@ -68,7 +68,7 @@ export interface RecommendationResponse {
   }
 }
 
-export interface DinTopKResponse {
+export interface DinTopKData {
   userId: number
   items: RecommendationItem[]
   modelVersion: string
@@ -76,6 +76,12 @@ export interface DinTopKResponse {
   year: number
   hitCache: boolean
   latencyMs: number
+}
+
+export interface DinTopKResponse {
+  code: number
+  msg: string
+  data: DinTopKData
 }
 
 /**
@@ -103,6 +109,15 @@ export interface CachedUserSampleResponse {
   dataVersion: string
   year: number
   onlyCached: boolean
+}
+
+export interface DinRandomUserResponse {
+  code: number
+  msg: string
+  data: {
+    userId: number
+    source: string
+  }
 }
 
 export interface BoundingBox {
@@ -136,6 +151,15 @@ export interface RecognitionResponse {
 }
 
 // 订单相关
+export enum OrderStatus {
+  WAIT_PAY = 'WAIT_PAY',
+  PAID = 'PAID',
+  FINISHED = 'FINISHED',
+  CANCELED = 'CANCELED',
+  DUPLICATE = 'DUPLICATE',
+  BLOCKED = 'BLOCKED',
+}
+
 export interface Order {
   id: number
   pid: number
@@ -144,14 +168,8 @@ export interface Order {
   productName: string
   productPrice: number
   number: number
-  status: string
+  status: OrderStatus
   version: number
-}
-
-export interface OrderCreateResponse {
-  code: number
-  msg: string
-  orderId: number
 }
 
 // 支付相关

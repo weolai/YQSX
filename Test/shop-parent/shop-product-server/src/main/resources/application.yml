@@ -5,7 +5,7 @@ spring:
     lazy-initialization: true
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/shop-product?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8
+    url: jdbc:mysql://localhost:3306/shop-product?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:1234}
     hikari:
@@ -18,14 +18,14 @@ spring:
     sentinel:
       transport:
         port: 8723
-  # Sentinel 本地规则开关（默认启用，可通过 Nacos 配置中心或环境变量关闭）
-sentinel:
-  rule:
-    enabled: true
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 20MB
+  # Sentinel 本地规则开关（默认启用，可通过 Nacos 配置中心或环境变量关闭）
+sentinel:
+  rule:
+    enabled: true
 
 # DIN 推荐服务地址（Python FastAPI 服务）
 din:

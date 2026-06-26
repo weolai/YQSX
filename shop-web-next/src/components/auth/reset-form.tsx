@@ -92,13 +92,13 @@ export function ResetForm({
             {countdown > 0 ? `${countdown}s 后重发` : "获取验证码"}
           </Button>
         </div>
-        <p className="text-xs text-white/60">演示环境验证码将输出在后端控制台</p>
+
       </div>
 
       <PasswordInput
         label="新密码"
         labelClassName="text-white flex items-center gap-2"
-        placeholder="请输入新密码（至少 6 位）"
+        placeholder="请输入至少 6 位新密码"
         value={newPassword}
         onChange={(e) => onNewPasswordChange(e.target.value)}
         autoComplete="new-password"
@@ -146,7 +146,7 @@ export function ResetForm({
         {displayLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            处理中...
+            正在处理...
           </>
         ) : (
           "重置密码"

@@ -6,6 +6,7 @@ import com.alibaba.csp.sentinel.slots.block.flow.FlowRuleManager;
 import com.gec.shop.order.pojo.Order;
 import com.gec.shop.payment.feign.OrderFeignClient;
 import com.gec.shop.payment.mapper.PaymentMapper;
+import com.gec.shop.payment.pojo.PaymentResult;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,11 +93,11 @@ class PaymentControllerConcurrencyTest {
             futures[i] = executor.submit(() -> {
                 try {
                     startLatch.await();
-                    Map<String, Object> result = paymentController.pay(orderId);
-                    int code = (int) result.get("code");
-                    if (code == 200 && "支付成功".equals(result.get("msg"))) {
+                    PaymentResult result = paymentController.pay(orderId);
+                    int code = result.getCode();
+                    if (code == 200 && "支付成功".equals(result.getMsg())) {
                         successCount.incrementAndGet();
-                    } else if (code == 429 && String.valueOf(result.get("msg")).contains("订单正在支付中")) {
+                    } else if (code == 429 && result.getMsg().contains("订单正在支付中")) {
                         lockedCount.incrementAndGet();
                     }
                 } catch (Exception e) {

@@ -1,0 +1,18 @@
+# ============================================================
+# Nacos 配置中心全局共享配置
+# data-id: global-config.yaml
+# group:   DEFAULT_GROUP
+# 说明：本文件由 setup.ps1 通过 Nacos Open API 自动导入到配置中心
+# 所有微服务（gateway/user/product/order/payment）启动时从此处读取 jwt.secret
+# ============================================================
+
+jwt:
+  # JWT 密钥：必须 >= 32 字节。生产环境请重新生成：
+  # 生成方式（PowerShell 或任意 openssl 环境）：
+  #   - join((48..122) | Get-Random -Count 48 | % {[char]$_}) -Path ''    # 仅字母数字
+  # 当前为开发默认值，setup.ps1 会询问是否替换
+  secret: dev-only-jwt-secret-key-please-change-in-prod-32bytes
+
+db:
+  # 数据库公共参数（各服务的 application.yml 已使用 ${DB_USER} ${DB_PASSWORD}）
+  common-params: serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8

@@ -20,7 +20,7 @@ import { useIsClient } from "@/hooks/use-is-client";
 const navItems: NavItem[] = [
   { id: "home", icon: <Home />, label: "首页", href: "/" },
   { id: "recognize", icon: <Camera />, label: "拍照识别", href: "/recognize" },
-  { id: "recommend", icon: <Sparkles />, label: "DIN 推荐", href: "/recognize" },
+  { id: "recommend", icon: <Sparkles />, label: "智能推荐", href: "/recommend" },
   { id: "products", icon: <ShoppingBag />, label: "商品列表", href: "/products" },
   { id: "orders", icon: <ClipboardList />, label: "我的订单", href: "/orders" },
 ];
@@ -49,7 +49,7 @@ export function Navbar() {
               YQSX
             </span>
             <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-              智能零食
+              智能零食商城
             </span>
           </Link>
 

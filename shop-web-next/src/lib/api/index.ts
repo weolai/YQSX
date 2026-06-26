@@ -1,5 +1,5 @@
 import request from './request'
-import type { LoginResponse, RegisterResponse, ResetPasswordResponse, SendCodeResponse, UserInfo, Product, RecognitionResponse, Order, OrderCreateResponse, PaymentResponse, RecommendationResponse, DinTopKResponse, DinTopKBackendResponse, CachedUserSampleResponse } from '@/types'
+import type { LoginResponse, RegisterResponse, ResetPasswordResponse, SendCodeResponse, UserInfo, Product, RecognitionResponse, Order, PaymentResponse, RecommendationResponse, DinTopKResponse, DinTopKBackendResponse, CachedUserSampleResponse, DinRandomUserResponse, DinTopKData } from '@/types'
 
 // 认证接口
 export const authApi = {
@@ -74,6 +74,11 @@ export const productApi = {
 
   // ========== 调试/诊断接口（生产环境请使用 getDinTopKFromBackend） ==========
 
+  // 从本地 CSV 数据集中随机抽取一个 DIN 用户 ID
+  getDinRandomUser: () => {
+    return request.get<DinRandomUserResponse>('/din/random-user')
+  },
+
   // [调试] 获取缓存中真实存在的用户 ID 列表（直连 Python 服务，仅用于诊断缓存状态）
   getCachedUserSample: (n: number = 100, onlyCached: boolean = true) => {
     return request.get<CachedUserSampleResponse>('/din/users/sample', {
@@ -85,7 +90,7 @@ export const productApi = {
   getDinTopK: (userId: number, k: number = 40) => {
     return request.get<DinTopKResponse>('/din/topk', {
       params: { userId, k }
-    })
+    }).then(res => res.data as DinTopKData)
   },
 
   // ========== 生产业务接口 ==========
@@ -100,9 +105,9 @@ export const productApi = {
 
 // 订单接口
 export const orderApi = {
-  // 创建订单
-  create: (pid: number, uid: number) => {
-    return request.post<OrderCreateResponse>('/orders/save', { pid, uid })
+  // 创建订单（后端返回完整 Order 实体）
+  create: (pid: number, uid: number, number: number = 1) => {
+    return request.post<Order>('/orders/save', { pid, uid, number })
   },
   
   // 查询订单

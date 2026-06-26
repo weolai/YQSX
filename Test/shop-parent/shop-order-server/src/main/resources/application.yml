@@ -18,7 +18,7 @@ spring:
         max-wait: 3000ms
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/shop-order?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8
+    url: jdbc:mysql://localhost:3306/shop-order?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:1234}
     hikari:
@@ -56,6 +56,8 @@ feign:
     enabled: true
 
 # 链路追踪调试配置
+# Sprint 2: 默认 false,保持幂等语义
+# 仅压测场景手动开启 true 跳过幂等检查以强制走完整链路
 app:
   trace:
-    full-chain: true
+    full-chain: false

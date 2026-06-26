@@ -65,6 +65,7 @@ Desktop.ini
 *~
 
 # ==================== Local env ====================
+.env
 .env.local
 .env.*.local
 

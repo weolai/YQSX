@@ -15,13 +15,17 @@ public class DinRecommendFeignFallback implements DinRecommendFeignClient {
     public DinTopKResponseDto getTopKRecommendations(Long userId, Integer k) {
         log.warn("DIN 推荐服务不可用，触发降级, userId={}, k={}", userId, k);
         DinTopKResponseDto fallback = new DinTopKResponseDto();
-        fallback.setUserId(userId);
-        fallback.setItems(null);
-        fallback.setHitCache(false);
-        fallback.setLatencyMs(0L);
-        fallback.setModelVersion("fallback");
-        fallback.setDataVersion("fallback");
-        fallback.setYear(0);
+        fallback.setCode(503);
+        fallback.setMsg("fallback: DIN service unavailable");
+        DinTopKResponseDto.DinTopKData data = new DinTopKResponseDto.DinTopKData();
+        data.setUserId(userId);
+        data.setItems(null);
+        data.setHitCache(false);
+        data.setLatencyMs(0L);
+        data.setModelVersion("fallback");
+        data.setDataVersion("fallback");
+        data.setYear(0);
+        fallback.setData(data);
         return fallback;
     }
 }

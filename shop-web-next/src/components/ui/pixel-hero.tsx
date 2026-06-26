@@ -25,11 +25,11 @@ const THEME_COLORS = [
 ];
 
 export function PixelHero({
-  word1 = "AI 智能",
-  word2 = "零食商城",
-  description = "拍照识别零食，AI 智能推荐，一键下单，享受未来购物体验。",
-  primaryCta = "开始识别",
-  secondaryCta = "浏览商品",
+  word1 = "拍照识别零食，",
+  word2 = "推荐你可能爱吃的商品",
+  description = "上传零食照片，系统将识别图中商品，并结合你的浏览偏好推荐相似零食。也可以直接浏览商品，快速完成下单。",
+  primaryCta = "立即拍照识别",
+  secondaryCta = "先逛逛商品",
   onPrimaryClick,
   onSecondaryClick,
 }: PixelHeroProps) {
@@ -57,7 +57,7 @@ export function PixelHero({
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8"
         >
           <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium text-muted-foreground">AI 驱动的智能购物体验</span>
+          <span className="text-sm font-medium text-muted-foreground">智能识别 · 个性化推荐 · 快速下单</span>
         </motion.div>
 
         <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-serif font-semibold tracking-tight mb-8">

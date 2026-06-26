@@ -82,7 +82,7 @@ GET /api/v1/products/getById?id=1
 ```json
 {
   "code": 200,
-  "message": "success",
+  "msg": "success",
   "data": {
     "id": 1,
     "name": "商品名称"
@@ -96,7 +96,7 @@ GET /api/v1/products/getById?id=1
 ```json
 {
   "code": 200,
-  "message": "success",
+  "msg": "success",
   "data": {
     "list": [
       {
@@ -122,7 +122,7 @@ GET /api/v1/products/getById?id=1
 ```json
 {
   "code": 400,
-  "message": "参数错误",
+  "msg": "参数错误",
   "data": null,
   "errors": [
     {
@@ -145,7 +145,7 @@ GET /api/v1/products/getById?id=1
 public class Result<T> implements Serializable {
     
     private Integer code;
-    private String message;
+    private String msg;
     private T data;
     private Long timestamp;
     
@@ -156,7 +156,7 @@ public class Result<T> implements Serializable {
     public static <T> Result<T> success() {
         Result<T> result = new Result<>();
         result.setCode(200);
-        result.setMessage("success");
+        result.setMsg("success");
         return result;
     }
     
@@ -166,21 +166,21 @@ public class Result<T> implements Serializable {
         return result;
     }
     
-    public static <T> Result<T> success(String message, T data) {
+    public static <T> Result<T> success(String msg, T data) {
         Result<T> result = success(data);
-        result.setMessage(message);
+        result.setMsg(msg);
         return result;
     }
     
-    public static <T> Result<T> error(Integer code, String message) {
+    public static <T> Result<T> error(Integer code, String msg) {
         Result<T> result = new Result<>();
         result.setCode(code);
-        result.setMessage(message);
+        result.setMsg(msg);
         return result;
     }
     
-    public static <T> Result<T> error(String message) {
-        return error(500, message);
+    public static <T> Result<T> error(String msg) {
+        return error(500, msg);
     }
 }
 ```
@@ -863,6 +863,23 @@ public class ApiLogAspect {
 
 ### 认证相关
 
+#### 服务健康检查
+
+```
+GET /api/user/hello
+```
+
+**说明**：无需 JWT，用于验证用户服务是否存活。
+
+**响应示例**：
+```json
+{
+  "service": "shop-user-service",
+  "port": "8083",
+  "msg": "user service is running"
+}
+```
+
 #### 用户登录
 
 ```
@@ -891,6 +908,85 @@ Content-Type: application/json
 }
 ```
 
+#### 发送短信验证码
+
+```
+POST /api/user/send-code
+Content-Type: application/json
+```
+
+**说明**：用于注册和重置密码前置流程。生产环境验证码通过真实短信通道下发，dev/test 环境会在响应中返回 `verifyCode` 便于调试。
+
+**请求示例**：
+```json
+{
+  "phone": "13800138000",
+  "type": "REGISTER"
+}
+```
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "验证码发送成功",
+  "verifyCode": "123456"
+}
+```
+
+#### 手机号验证码注册
+
+```
+POST /api/user/register
+Content-Type: application/json
+```
+
+**请求示例**：
+```json
+{
+  "phone": "13800138000",
+  "code": "123456",
+  "username": "newuser",
+  "password": "123456",
+  "nickname": "新用户"
+}
+```
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "注册成功",
+  "userId": 2,
+  "username": "newuser",
+  "token": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+#### 手机号验证码重置密码
+
+```
+POST /api/user/reset-password
+Content-Type: application/json
+```
+
+**请求示例**：
+```json
+{
+  "phone": "13800138000",
+  "code": "123456",
+  "newPassword": "newpass"
+}
+```
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "密码重置成功，请使用新密码登录"
+}
+```
+
 #### 获取当前用户
 
 ```
@@ -907,9 +1003,53 @@ Authorization: Bearer <token>
 }
 ```
 
+#### 内部查询用户（仅限内部服务）
+
+```
+GET /api/user/internal/{id}
+X-Internal-Call: true
+```
+
+**说明**：该接口用于订单/支付等服务内部调用，外部请求必须携带 `X-Internal-Call: true` 请求头。
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "id": 1,
+  "username": "admin",
+  "nickname": "管理员"
+}
+```
+
 ---
 
 ### 商品相关
+
+#### 商品列表
+
+```
+GET /api/products/list?categoryId={categoryId}
+Authorization: Bearer <token>
+```
+
+**说明**：返回全部商品列表，可选 `categoryId` 按类别筛选。
+
+**响应示例**：
+```json
+[
+  {
+    "id": 11,
+    "name": "Cheetoz 车轮 零食—8081",
+    "price": 11.5,
+    "stock": 600,
+    "categoryId": 11,
+    "imageUrl": "/images/products/cheetoz_wheel.jpg",
+    "sales": 270
+  }
+]
+```
 
 #### 商品详情
 
@@ -974,7 +1114,11 @@ uid: <用户ID，可选>
     }
   ],
   "detectedCount": 4,
-  "categoryName": "Cheetoz 车轮零食"
+  "categoryName": "Cheetoz 车轮零食",
+  "imageDimensions": {
+    "width": 960,
+    "height": 1920
+  }
 }
 ```
 
@@ -984,6 +1128,8 @@ uid: <用户ID，可选>
 GET /api/products/recommend?categoryId={categoryId}&limit={limit}
 Authorization: Bearer <token>
 ```
+
+**说明**：`limit` 默认 10，返回同类别的热门商品，响应为商品数组（不经 Result 包装）。
 
 **响应示例**：
 ```json
@@ -1000,6 +1146,41 @@ Authorization: Bearer <token>
 ]
 ```
 
+#### 基于 DIN 模型获取用户 TopK 推荐
+
+```
+GET /api/products/din/topk?userId={userId}&k={k}
+Authorization: Bearer <token>
+```
+
+**说明**：后端调用 Python 推荐服务并聚合商品详情；`k` 默认 10，最大值 40，超过会被强制限制为 40。当推荐服务异常时自动降级为热销商品，Sentinel 限流时返回 `status: blocked`。
+
+**响应示例**：
+```json
+{
+  "userId": 1,
+  "products": [
+    {
+      "id": 11,
+      "name": "Cheetoz 车轮 零食",
+      "price": 11.5,
+      "stock": 600,
+      "categoryId": 11,
+      "imageUrl": "/images/products/cheetoz_wheel.jpg",
+      "sales": 270
+    }
+  ],
+  "hitCache": true,
+  "latencyMs": 45,
+  "modelVersion": "din_v1",
+  "dataVersion": "2025Q1",
+  "year": 2025,
+  "fallback": false,
+  "status": "normal",
+  "reason": "基于历史行为的个性化推荐"
+}
+```
+
 ---
 
 ### 订单相关
@@ -1009,18 +1190,32 @@ Authorization: Bearer <token>
 ```
 POST /api/orders/save
 Authorization: Bearer <token>
-Content-Type: application/x-www-form-urlencoded
+Content-Type: application/json
+```
 
-pid: <商品ID>
-uid: <用户ID>
+**说明**：使用 JSON 请求体创建订单，包含防重复提交锁，重复请求会返回已存在的待支付订单。
+
+**请求示例**：
+```json
+{
+  "pid": 11,
+  "uid": 1,
+  "number": 1
+}
 ```
 
 **响应示例**：
 ```json
 {
-  "code": 200,
-  "msg": "order create success",
-  "orderId": 1001
+  "id": 1001,
+  "pid": 11,
+  "uid": 1,
+  "username": "admin",
+  "productName": "Cheetoz 车轮 零食",
+  "productPrice": 11.5,
+  "number": 1,
+  "status": "WAIT_PAY",
+  "version": 0
 }
 ```
 
@@ -1055,39 +1250,55 @@ Authorization: Bearer <token>
 
 **响应示例**：
 ```json
-{
-  "code": 200,
-  "msg": "success",
-  "data": [
-    {
-      "id": 79,
-      "pid": 1,
-      "uid": 1,
-      "username": "admin",
-      "productName": "Ashi Mashi 经典零食",
-      "productPrice": 8.5,
-      "number": 1,
-      "status": "PAID",
-      "version": 1
-    }
-  ]
-}
+[
+  {
+    "id": 79,
+    "pid": 1,
+    "uid": 1,
+    "username": "admin",
+    "productName": "Ashi Mashi 经典零食",
+    "productPrice": 8.5,
+    "number": 1,
+    "status": "PAID",
+    "version": 1
+  }
+]
 ```
 
-#### 更新订单状态
+#### 更新订单状态（内部服务调用）
 
 ```
 POST /api/orders/updateStatus
 Authorization: Bearer <token>
+X-Internal-Call: true
 Content-Type: application/x-www-form-urlencoded
 
-orderId: <订单ID>
+id: <订单ID>
 status: <目标状态>
 ```
+
+**说明**：该接口仅限内部服务（如支付服务）回调使用，必须携带 `X-Internal-Call: true` 请求头，否则返回 403。订单状态流转：WAIT_PAY → PAID → FINISHED。
 
 ---
 
 ### 支付相关
+
+#### 服务健康检查
+
+```
+GET /api/payment/hello
+```
+
+**说明**：无需 JWT，用于验证支付服务是否存活。
+
+**响应示例**：
+```json
+{
+  "service": "shop-payment-service",
+  "port": "8084",
+  "msg": "payment service is running"
+}
+```
 
 #### 订单支付
 
@@ -1099,13 +1310,17 @@ Content-Type: application/x-www-form-urlencoded
 orderId: <订单ID>
 ```
 
+**说明**：支付成功后通过内部调用更新订单状态为 PAID。
+
 **响应示例**：
 ```json
 {
   "code": 200,
-  "msg": "payment success",
+  "msg": "支付成功",
   "orderId": 1001,
-  "orderUpdateResult": "success"
+  "paymentId": 5001,
+  "orderUpdateResult": "success",
+  "status": "PAID"
 }
 ```
 
@@ -1169,6 +1384,59 @@ file: <图片文件>
 
 ---
 
+### Python 推荐服务（开发环境 Next.js 代理）
+
+> 以下接口不经过 Gateway，由 `shop-web-next` 的 `next.config.ts` rewrites 直接代理到 Python 服务 `http://127.0.0.1:8000`，仅用于调试/诊断。
+
+#### DIN TopK 推荐（原始接口）
+
+```
+GET /api/din/topk?userId={userId}&k={k}
+```
+
+**说明**：直接访问 Python 推荐服务 `/api/recommend/topk`，无后端兜底。
+
+**响应示例**：
+```json
+{
+  "userId": 1,
+  "items": [
+    {
+      "itemId": 11,
+      "score": 0.95,
+      "rank": 1,
+      "reason": "历史兴趣相似"
+    }
+  ],
+  "modelVersion": "din_v1",
+  "dataVersion": "2025Q1",
+  "year": 2025,
+  "hitCache": true,
+  "latencyMs": 30
+}
+```
+
+#### 获取缓存用户样本
+
+```
+GET /api/din/users/sample?n={n}&onlyCached={onlyCached}
+```
+
+**说明**：查询 Redis 缓存中真实存在的用户 ID 列表，用于诊断缓存命中情况。
+
+**响应示例**：
+```json
+{
+  "userIds": [1, 2, 3],
+  "modelVersion": "din_v1",
+  "dataVersion": "2025Q1",
+  "year": 2025,
+  "onlyCached": true
+}
+```
+
+---
+
 ### 网关路由规则
 
 | 路由 | 目标服务 | 路径前缀 |
@@ -1181,11 +1449,81 @@ file: <图片文件>
 **白名单**（无需 JWT）：
 - `/api/user/login`
 - `/api/user/hello`
+- `/api/user/register`
+- `/api/user/send-code`
+- `/api/user/reset-password`
 
 **认证头**：
 ```
 Authorization: Bearer <token>
 ```
+
+---
+
+### 服务发现接口（dev/test only）
+
+> 仅在 `dev`/`test` profile 下加载，用于查看 Nacos 注册中心的服务实例，生产环境不暴露。
+
+#### 获取服务列表
+
+```
+GET /api/discovery/services
+```
+
+**响应示例**：
+```json
+[
+  "shop-user-service",
+  "shop-product-service",
+  "shop-order-service",
+  "shop-payment-service"
+]
+```
+
+#### 获取服务实例
+
+```
+GET /api/discovery/instances/{serviceId}
+```
+
+**响应示例**：
+```json
+[
+  {
+    "serviceId": "shop-user-service",
+    "host": "127.0.0.1",
+    "port": 8083,
+    "uri": "http://127.0.0.1:8083",
+    "secure": false,
+    "metadata": {},
+    "scheme": "http"
+  }
+]
+```
+
+---
+
+### Sentinel 演示与测试接口（dev/test only）
+
+> 以下接口用于 Sentinel 流控、降级、热点、授权规则演示，仅在 `dev`/`test` profile 下使用。
+
+| 接口 | 说明 |
+|------|------|
+| `GET /hotSpot1?productId={productId}` | 热点参数限流演示 |
+| `GET /anno1?name={name}` | `@SentinelResource` 注解限流/降级演示 |
+| `GET /sentinel1` | 慢调用模拟 |
+| `GET /sentinel2` | 正常接口对比 |
+| `GET /sentinel-read` | 关联流控-读请求 |
+| `GET /sentinel-write` | 关联流控-写请求 |
+| `GET /queryOrder` | 链路流控-查询订单入口 |
+| `GET /createOrder` | 链路流控-创建订单入口 |
+| `GET /fallBack1` | 慢调用比例降级 |
+| `GET /fallBack2` | 异常比例降级 |
+| `GET /fallBack3?name={name}` | 异常数降级 |
+| `GET /auth1?serviceName={serviceName}` | 授权规则（黑白名单）演示 |
+| `GET /orders/test-product/{pid}` | 订单服务 Feign 调用商品服务测试 |
+| `GET /orders/test-create/{pid}/{uid}` | 直接创建订单测试 |
+| `GET /orders/test-save/{pid}/{uid}` | 带分布式锁创建订单测试 |
 
 ---
 

@@ -1,0 +1,8 @@
+# 本地开发 profile：禁用 Nacos 配置中心与服务注册发现
+spring:
+  cloud:
+    nacos:
+      config:
+        enabled: false
+      discovery:
+        enabled: false

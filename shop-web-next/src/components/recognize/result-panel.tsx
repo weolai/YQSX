@@ -1,11 +1,12 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { X, Sparkles, ScanLine, Package, ShoppingBag, ArrowRight } from 'lucide-react'
+import { X, Sparkles, ScanLine, Package, ShoppingBag, ArrowRight, AlertTriangle, Info } from 'lucide-react'
 import { StaggerContainer, StaggerItem } from '@/components/design/scroll-reveal'
 import { MagneticButton } from '@/components/design/magnetic-button'
 import { getCategoryByYoloClassId } from '@/lib/utils/category-mapping'
@@ -69,48 +70,75 @@ export function RecognitionResultPanel({
           exit={{ opacity: 0, y: -10 }}
           className="space-y-6"
         >
-          {/* 检测目标 */}
-          <div className="p-5 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-muted-foreground flex items-center">
-                <Sparkles className="mr-1.5 h-4 w-4 text-accent" />
-                检测到的零食
-              </h3>
-              <Badge className="bg-primary text-white border-0">
-                {result.detectedCount} 个目标
-              </Badge>
+          {/* 状态提示：fallback / no_match */}
+          {result.status === 'fallback' && (
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-700">识别服务暂时不可用</p>
+                <p className="text-xs text-amber-600/80 mt-0.5">
+                  {result.message || '已为您展示同类推荐商品，请稍后重试精确识别'}
+                </p>
+              </div>
             </div>
-            {result.detections.length === 0 ? (
-              <p className="text-sm text-muted-foreground">未检测到零食，请尝试上传更清晰的图片</p>
-            ) : (
-              <StaggerContainer className="space-y-3">
-                {result.detections.map((detection, index) => {
-                  const category = getCategoryByYoloClassId(detection.productClassId)
-                  const displayName = category?.displayName || detection.productClassName
-                  return (
-                    <StaggerItem key={index}>
-                      <div className="p-3 rounded-lg bg-background/50 border border-border/50">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-foreground">{displayName}</span>
-                          <Badge className="bg-primary/10 text-primary border-primary/20">
-                            {(detection.confidence * 100).toFixed(1)}%
-                          </Badge>
+          )}
+
+          {result.status === 'no_match' && (
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-blue-700">识别结果暂无对应商品</p>
+                <p className="text-xs text-blue-600/80 mt-0.5">
+                  {result.message || '当前识别到的类别尚未关联商品，请尝试上传其他零食图片'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 检测目标 */}
+          {result.status !== 'no_match' && (
+            <div className="p-5 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center">
+                  <Sparkles className="mr-1.5 h-4 w-4 text-accent" />
+                  检测到的零食
+                </h3>
+                <Badge className="bg-primary text-white border-0">
+                  {result.detectedCount ?? 0} 个目标
+                </Badge>
+              </div>
+              {(result.detections?.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground">未检测到零食，请尝试上传更清晰的图片。</p>
+              ) : (
+                <StaggerContainer className="space-y-3">
+                  {result.detections.map((detection, index) => {
+                    const category = getCategoryByYoloClassId(detection.productClassId)
+                    const displayName = category?.displayName || detection.productClassName
+                    return (
+                      <StaggerItem key={index}>
+                        <div className="p-3 rounded-lg bg-background/50 border border-border/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-foreground">{displayName}</span>
+                            <Badge className="bg-primary/10 text-primary border-primary/20">
+                              {(detection.confidence * 100).toFixed(1)}%
+                            </Badge>
+                          </div>
+                          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${detection.confidence * 100}%` }}
+                              transition={{ duration: 0.8, delay: index * 0.1 }}
+                              className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+                            />
+                          </div>
                         </div>
-                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${detection.confidence * 100}%` }}
-                            transition={{ duration: 0.8, delay: index * 0.1 }}
-                            className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-                          />
-                        </div>
-                      </div>
-                    </StaggerItem>
-                  )
-                })}
-              </StaggerContainer>
-            )}
-          </div>
+                      </StaggerItem>
+                    )
+                  })}
+                </StaggerContainer>
+              )}
+            </div>
+          )}
 
           {/* 推荐商品 */}
           {result.products && result.products.length > 0 && (
@@ -118,7 +146,7 @@ export function RecognitionResultPanel({
               <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center justify-between">
                 <span className="flex items-center">
                   <ShoppingBag className="mr-1.5 h-4 w-4 text-primary" />
-                  为你推荐
+                  {result.status === 'fallback' ? '同类热销推荐' : '为你推荐相似商品'}
                 </span>
                 <span className="text-xs text-primary/70 bg-primary/5 px-2 py-0.5 rounded-full">
                   共 {result.products.length} 件
@@ -136,9 +164,11 @@ export function RecognitionResultPanel({
                       <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center flex-shrink-0 mr-4 relative overflow-hidden">
                         <Package className="h-6 w-6 text-primary" />
                         {product.imageUrl && (
-                          <img
+                          <Image
                             src={product.imageUrl}
                             alt={product.name}
+                            fill
+                            sizes="48px"
                             className="absolute inset-0 w-full h-full object-cover"
                             onError={(e) => { e.currentTarget.style.display = 'none' }}
                           />
@@ -148,7 +178,7 @@ export function RecognitionResultPanel({
                         <h4 className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
                           {product.name}
                         </h4>
-                        <p className="text-sm text-muted-foreground">库存: {product.stock}</p>
+                        <p className="text-sm text-muted-foreground">库存：{product.stock}</p>
                       </div>
                       <div className="text-right flex-shrink-0 ml-4">
                         <p className="text-lg font-bold text-primary">¥{product.price}</p>
@@ -181,7 +211,7 @@ export function RecognitionResultPanel({
           <div className="w-20 h-20 mb-5 rounded-2xl bg-primary/10 flex items-center justify-center">
             <ScanLine className="h-10 w-10 text-primary/50" />
           </div>
-          <p>上传图片后，识别结果将显示在这里</p>
+          <p>上传图片后，识别结果将显示在这里。</p>
         </motion.div>
       )}
     </AnimatePresence>

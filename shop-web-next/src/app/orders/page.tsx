@@ -15,14 +15,14 @@ import { EmptyState } from '@/components/async-state/empty-state'
 import { OrderStatusBadge } from '@/components/orders/order-status-badge'
 import { orderApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/stores/auth'
-import type { Order } from '@/types'
+import { OrderStatus, type Order } from '@/types'
 
 const statusFilters = [
   { key: 'all', label: '全部' },
-  { key: 'WAIT_PAY', label: '待支付' },
-  { key: 'PAID', label: '已支付' },
-  { key: 'FINISHED', label: '已完成' },
-  { key: 'CANCELED', label: '已取消' },
+  { key: OrderStatus.WAIT_PAY, label: '待支付' },
+  { key: OrderStatus.PAID, label: '已支付' },
+  { key: OrderStatus.FINISHED, label: '已完成' },
+  { key: OrderStatus.CANCELED, label: '已取消' },
 ]
 
 function getOrderAmount(order: Order) {
@@ -33,11 +33,13 @@ function getOrderQuantity(order: Order) {
   return order.number
 }
 
-const statusBorderClass: Record<string, string> = {
-  WAIT_PAY: 'border-l-accent',
-  PAID: 'border-l-green-500',
-  FINISHED: 'border-l-blue-500',
-  CANCELED: 'border-l-destructive',
+const statusBorderClass: Record<OrderStatus, string> = {
+  [OrderStatus.WAIT_PAY]: 'border-l-accent',
+  [OrderStatus.PAID]: 'border-l-green-500',
+  [OrderStatus.FINISHED]: 'border-l-blue-500',
+  [OrderStatus.CANCELED]: 'border-l-destructive',
+  [OrderStatus.DUPLICATE]: 'border-l-accent',
+  [OrderStatus.BLOCKED]: 'border-l-orange-500',
 }
 
 export default function OrdersPage() {
@@ -114,7 +116,7 @@ export default function OrdersPage() {
             我的订单
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            共 {orders.length} 笔订单，随时查看购买记录
+            共 {orders.length} 笔订单，可随时查看购买记录与支付状态。
           </p>
         </ScrollReveal>
 
@@ -144,7 +146,7 @@ export default function OrdersPage() {
         ) : filteredOrders.length === 0 ? (
           <EmptyState
             icon={<Package className="h-10 w-10 text-primary/60" />}
-            title={activeFilter === 'all' ? '暂无订单' : '该状态下暂无订单'}
+            title={activeFilter === 'all' ? '暂无订单' : '当前状态下暂无订单。'}
             action={
               <Button
                 onClick={() => router.push('/products')}
@@ -183,7 +185,7 @@ export default function OrdersPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-border/50">
                       <div>
                         <p className="font-medium text-foreground line-clamp-1">{order.productName}</p>
-                        <p className="text-sm text-muted-foreground">数量: {getOrderQuantity(order)}</p>
+                        <p className="text-sm text-muted-foreground">数量：{getOrderQuantity(order)}</p>
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="text-2xl font-serif font-semibold text-primary">

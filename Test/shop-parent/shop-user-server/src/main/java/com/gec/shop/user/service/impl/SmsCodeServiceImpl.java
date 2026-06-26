@@ -84,8 +84,9 @@ public class SmsCodeServiceImpl implements SmsCodeService {
         smsCode.setUsed(0);
         smsCodeMapper.insert(smsCode);
 
-        // 演示环境：日志输出验证码
-        log.info("[SMS-CODE] phone={}, type={}, code={}", phone, type, code);
+        // 安全约束:验证码不写入日志(防 PCI-DSS / 个人信息保护法违规)
+        // dev/test 环境如需调试,可通过 DEBUG 级别单独开启
+        log.info("[SMS-CODE] phone={}, type={}", phone, type);
 
         Map<String, String> result = new HashMap<>();
         result.put("msg", "验证码已发送");

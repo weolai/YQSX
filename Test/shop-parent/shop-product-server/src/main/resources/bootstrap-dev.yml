@@ -1,0 +1,2 @@
+# dev profile 不再覆盖 Nacos 配置
+# 服务注册发现与配置中心恢复使用 bootstrap.yml 中的 Nacos 配置

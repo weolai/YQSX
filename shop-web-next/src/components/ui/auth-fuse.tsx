@@ -127,10 +127,14 @@ export function AuthFuse({
       if (typeof result === "object" && result.success) {
         setCountdown(60);
         setSuccessMsg("验证码已发送，请注意查收");
-        setSentCode(result.code);
-        setShowCodeDialog(true);
+        // 安全约束:验证码弹窗仅在 development 构建展示
+        // 生产构建(NODE_ENV=production)不展示验证码,验证码应通过真实短信通道下发
+        if (process.env.NODE_ENV === "development") {
+          setSentCode(result.code);
+          setShowCodeDialog(true);
+        }
       } else {
-        setLocalError(typeof result === "string" ? result : "验证码发送失败");
+        setLocalError(typeof result === "string" ? result : "验证码发送失败，请稍后再试");
       }
     } catch {
       setLocalError("验证码发送失败，请稍后再试");
@@ -157,7 +161,7 @@ export function AuthFuse({
       try {
         const result = await onLogin(username, password);
         if (result !== true) {
-          setLocalError(typeof result === "string" ? result : "登录失败，请检查用户名和密码");
+          setLocalError(typeof result === "string" ? result : "账号或密码不正确，请重新输入。");
         }
       } catch {
         setLocalError("登录失败，请稍后再试");
@@ -206,7 +210,7 @@ export function AuthFuse({
         if (result === true) {
           setSuccessMsg("注册成功，正在跳转...");
         } else {
-          setLocalError(typeof result === "string" ? result : "注册失败");
+          setLocalError(typeof result === "string" ? result : "注册失败，请检查信息后重试");
         }
       } catch {
         setLocalError("注册失败，请稍后再试");
@@ -218,11 +222,11 @@ export function AuthFuse({
 
     if (mode === "reset") {
       if (!validatePassword(newPassword)) {
-        setLocalError("新密码长度不能少于 6 位");
+        setLocalError("密码长度不能少于 6 位");
         return;
       }
       if (newPassword !== confirmNewPassword) {
-        setLocalError("两次输入的新密码不一致");
+        setLocalError("两次输入的密码不一致");
         return;
       }
       if (!onResetPassword) {
@@ -255,16 +259,16 @@ export function AuthFuse({
   ];
 
   const features = [
-    { icon: Camera, title: "智能识别", desc: "拍照即可识别零食种类" },
-    { icon: Sparkles, title: "AI 推荐", desc: "个性化商品推荐" },
-    { icon: ShoppingBag, title: "便捷下单", desc: "一键购买快速送达" },
-    { icon: Zap, title: "极速响应", desc: "秒级识别与推荐" },
+    { icon: Camera, title: "拍照识别", desc: "上传照片识别零食种类" },
+    { icon: Sparkles, title: "智能推荐", desc: "根据偏好推荐商品" },
+    { icon: ShoppingBag, title: "快速下单", desc: "选中商品直接购买" },
+    { icon: Zap, title: "订单可追踪", desc: "实时查看订单状态" },
   ];
 
   const modeTitles: Record<AuthMode, { title: string; subtitle: string }> = {
-    login: { title: "欢迎回来", subtitle: "登录您的账户，开启智能零食之旅" },
-    register: { title: "创建账户", subtitle: "手机号验证注册，安全又便捷" },
-    reset: { title: "重置密码", subtitle: "验证手机号后设置新密码" },
+    login: { title: "欢迎回来", subtitle: "登录账户，继续你的智能零食购物体验。" },
+    register: { title: "创建账户", subtitle: "使用手机号完成验证，开启智能零食推荐。" },
+    reset: { title: "重置密码", subtitle: "验证手机号后，设置新的登录密码。" },
   };
 
   return (
@@ -308,10 +312,10 @@ export function AuthFuse({
 
               <div className="space-y-3">
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-semibold leading-tight text-white">
-                  智能零食商城
+                  YQSX 智能零食商城
                 </h1>
                 <p className="text-base sm:text-lg text-white/90 max-w-md leading-relaxed">
-                  “<Typewriter text="发现每一口零食的惊喜，AI 让购物更有趣。" speed={70} loop delay={4000} />
+                  “<Typewriter text="发现更合口味的零食，让购物更高效。" speed={70} loop delay={4000} />
                   ”
                 </p>
               </div>
@@ -431,13 +435,13 @@ export function AuthFuse({
                 )}
               </AnimatePresence>
 
-              {mode === "login" && <p className="text-center text-xs text-white/70">测试账号：admin / 123456</p>}
+
             </div>
           </motion.div>
         </div>
       </motion.div>
 
-      {/* 演示环境验证码弹窗 */}
+      {/* 开发环境验证码提示弹窗 */}
       <AnimatePresence>
         {showCodeDialog && (
           <motion.div
@@ -460,8 +464,8 @@ export function AuthFuse({
                   <KeyRound className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">演示验证码</h3>
-                  <p className="text-sm text-white/70 mt-1">已为您生成验证码，请输入后完成验证</p>
+                  <h3 className="text-lg font-semibold text-white">验证码已发送</h3>
+                  <p className="text-sm text-white/70 mt-1">请输入收到的验证码完成验证</p>
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   {sentCode.split("").map((digit, index) => (

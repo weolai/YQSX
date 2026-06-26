@@ -13,8 +13,8 @@ export function PaymentProcessingView() {
       transition={{ duration: 0.3 }}
     >
       <Loader2 className="h-20 w-20 mx-auto mb-6 animate-spin text-primary" />
-      <h2 className="text-2xl font-serif font-semibold mb-4 text-foreground">支付处理中...</h2>
-      <p className="text-muted-foreground">请稍候，不要关闭页面</p>
+      <h2 className="text-2xl font-serif font-semibold mb-4 text-foreground">正在确认支付结果</h2>
+      <p className="text-muted-foreground">请勿重复提交或关闭页面，系统正在更新订单状态。</p>
     </motion.div>
   )
 }

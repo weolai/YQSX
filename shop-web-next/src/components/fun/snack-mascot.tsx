@@ -16,12 +16,12 @@ interface Particle {
 }
 
 const TIPS = [
-  "双击我可以打开智能问答哦~",
-  "点我一下，我会跳舞哦~",
-  "去拍照识别看看新零食吧！",
-  "今天想吃什么口味的零食？",
-  "我可以陪你逛一整天~",
-  "试试双击我的脑袋！",
+  "有问题可以问我",
+  "想找零食？我可以帮你",
+  "拍照识别，也能找相似商品",
+  "不知道买什么？试试智能推荐",
+  "双击打开智能问答",
+  "小助手待命中",
 ];
 
 const MOODS: Mood[] = ["idle", "happy", "wink", "surprised", "love"];
@@ -172,7 +172,7 @@ export function SnackMascot() {
         }
         style={{ x: smoothX, y: smoothY, rotate: bodyRotate }}
         className="relative w-20 h-20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full"
-        aria-label="零食小助手"
+        aria-label="零食智能助手"
       >
         <svg
           viewBox="0 0 56 56"
@@ -262,7 +262,7 @@ export function SnackMascot() {
         transition={isHovered ? {} : { delay: 2, duration: 4, repeat: Infinity, repeatDelay: 8 }}
         className="text-[10px] font-medium text-muted-foreground bg-card/80 px-2 py-1 rounded-full glass"
       >
-        {isHovered ? "双击打开问答~" : isSleepy ? "小人在睡觉..." : "双击我打开智能问答 ~"}
+        {isHovered ? "双击打开智能问答" : isSleepy ? "小助手待命中" : "双击打开智能问答"}
       </motion.span>
 
       <QaDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />

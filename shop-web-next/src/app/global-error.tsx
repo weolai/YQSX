@@ -41,7 +41,7 @@ export default function GlobalError({
               marginBottom: '0.75rem',
             }}
           >
-            应用发生严重错误
+            应用暂时不可用
           </h1>
           <p
             style={{
@@ -50,7 +50,7 @@ export default function GlobalError({
               marginBottom: '1.5rem',
             }}
           >
-            抱歉，应用遇到致命问题。请尝试刷新页面，若问题持续请联系技术支持。
+            系统遇到异常，请刷新页面后重试。如问题持续存在，请稍后再访问。
           </p>
 
           {process.env.NODE_ENV === 'development' && (
@@ -96,7 +96,7 @@ export default function GlobalError({
                 fontSize: '0.875rem',
               }}
             >
-              重试
+              刷新页面
             </button>
             <button
               onClick={() => window.location.reload()}

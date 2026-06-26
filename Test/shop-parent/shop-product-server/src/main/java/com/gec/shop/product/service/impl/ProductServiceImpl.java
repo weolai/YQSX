@@ -405,10 +405,13 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
             recommendResult = null;
         }
 
+        // Python 返回 {code, msg, data} 包装结构，业务字段在 data 内
+        DinTopKResponseDto.DinTopKData data = (recommendResult != null) ? recommendResult.getData() : null;
+
         // 服务不可用或返回空时，降级为热销商品列表
-        boolean fallback = recommendResult == null
-                || "fallback".equals(recommendResult.getModelVersion())
-                || CollectionUtils.isEmpty(recommendResult.getItems());
+        boolean fallback = data == null
+                || "fallback".equals(data.getModelVersion())
+                || CollectionUtils.isEmpty(data.getItems());
 
         List<Product> products;
         if (fallback) {
@@ -421,32 +424,33 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                     .last("LIMIT " + safeK)
                     .list();
         } else {
-            List<Long> itemIds = recommendResult.getItems().stream()
+            List<Long> itemIds = data.getItems().stream()
                     .map(RecommendationItemDto::getItemId)
                     .collect(Collectors.toList());
             // 批量查询商品详情，保持推荐顺序
             List<Product> dbProducts = baseMapper.selectBatchIds(itemIds);
             Map<Long, Product> productMap = dbProducts.stream()
                     .collect(Collectors.toMap(Product::getId, p -> p));
-            products = recommendResult.getItems().stream()
+            products = data.getItems().stream()
                     .map(item -> productMap.get(item.getItemId()))
                     .filter(Objects::nonNull)
                     .limit(safeK)
                     .collect(Collectors.toList());
 
             // 设置推荐理由摘要
-            boolean hitCache = Boolean.TRUE.equals(recommendResult.getHitCache());
+            boolean hitCache = Boolean.TRUE.equals(data.getHitCache());
             response.setReason(hitCache
                     ? "基于用户历史行为的个性化推荐（命中缓存）"
                     : "基于用户历史行为的个性化推荐（实时计算）");
         }
 
         response.setProducts(products);
-        response.setHitCache(recommendResult != null && Boolean.TRUE.equals(recommendResult.getHitCache()));
-        response.setLatencyMs(recommendResult != null ? recommendResult.getLatencyMs() : 0L);
-        response.setModelVersion(recommendResult != null ? recommendResult.getModelVersion() : "unknown");
-        response.setDataVersion(recommendResult != null ? recommendResult.getDataVersion() : "unknown");
-        response.setYear(recommendResult != null ? recommendResult.getYear() : 0);
+        response.setHitCache(data != null && Boolean.TRUE.equals(data.getHitCache()));
+        // 修复 NPE：避免 Long/Integer 三元表达式对 null 拆箱
+        response.setLatencyMs(data != null && data.getLatencyMs() != null ? data.getLatencyMs() : 0L);
+        response.setModelVersion(data != null ? data.getModelVersion() : "unknown");
+        response.setDataVersion(data != null ? data.getDataVersion() : "unknown");
+        response.setYear(data != null && data.getYear() != null ? data.getYear() : 0);
         return response;
     }
 

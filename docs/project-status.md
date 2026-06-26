@@ -583,6 +583,41 @@ shop-payment库
 
 ---
 
+---
+
+## 十一、启动与部署问题记录
+
+### 11.1 发现的问题
+
+| 问题 | 根因 | 影响 | 当前状态 |
+|------|------|------|---------|
+| 文档中前端项目/端口与实际不符 | 前端已从 Vue 3 (`shop-web:5173`) 切换为 Next.js (`shop-web-next:3000`)，文档未同步 | 新人按文档执行会进错目录、用错端口 | ⚠️ 已记录，待逐步修正 |
+| Grafana 端口 3000 与前端冲突 | 两者默认均使用 3000 | 同时启动时 Grafana 失败 | 已修复：Grafana 改用 3001 |
+| `start_project.py` 识别服务硬失败 | 脚本在识别服务启动失败时直接退出 | 识别服务问题导致整个项目无法启动 | 已修复：改为可选启动 |
+| `start_project.py` 未启动 Prometheus/Grafana/DIN | 脚本覆盖不全 | 可观测性与推荐能力需手动启动 | 已修复：脚本已补充 |
+| YOLO `.env` 模型路径错误 | 配置漂移，指向不存在的 `yolo_training_outputs` | 识别服务 503 | 已修复：指向真实 `best.pt` |
+| Windows 下 `Start-Process npm` 报错 | `npm` 是 `.cmd` 脚本，非 PE 可执行文件 | 前端无法通过 PowerShell 后台启动 | 已修复：改用 `cmd.exe /c` |
+
+### 11.2 已应用修复
+
+1. **识别服务 `.env`**：`MODEL_PATH` 已指向实际训练权重。
+2. **`start_project.py`**：
+   - 识别服务失败不阻塞主流程。
+   - 增加 Prometheus、Grafana、DIN 推荐服务启动。
+   - 修正 `npm` 启动方式。
+   - conda 环境名增加 `AIDetection-service` / `AIDetection` 回退。
+3. **Grafana 端口**：启动时固定为 `3001`。
+
+### 11.3 待完善
+
+- 统一修正 `README.md`、`implementation-guide.md`、`quick-reference.md` 中的 `shop-web` / `5173` 引用。
+- 将 Prometheus / Grafana / DIN 服务纳入 `dist-pack/start.ps1`。
+- 补充 `docs/startup-troubleshooting.md` 到知识库索引。
+
+详见：[启动问题排查与运维指南](./startup-troubleshooting.md)
+
+---
+
 **报告生成时间**: 2026-06-20  
-**项目版本**: 1.2.0  
+**项目版本**: 1.2.1  
 **综合完成度**: 80%

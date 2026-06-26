@@ -7,6 +7,7 @@ import com.gec.shop.order.pojo.Order;
 import com.gec.shop.payment.feign.OrderFeignClient;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.gec.shop.payment.mapper.PaymentMapper;
+import com.gec.shop.payment.pojo.PaymentResult;
 import com.gec.shop.common.util.RedisLockUtil;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +20,6 @@ import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
 import java.util.Collections;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -90,15 +90,15 @@ class PaymentControllerTest {
                 .thenReturn("success")
                 .thenReturn("success");
 
-        Map<String, Object> firstResult = paymentController.pay(orderId);
-        assertEquals(200, firstResult.get("code"));
-        assertEquals("支付成功", firstResult.get("msg"));
+        PaymentResult firstResult = paymentController.pay(orderId);
+        assertEquals(200, firstResult.getCode());
+        assertEquals("支付成功", firstResult.getMsg());
         assertEquals(1L, paymentMapper.selectCount(Wrappers.emptyWrapper()));
 
         order.setStatus("PAID");
-        Map<String, Object> secondResult = paymentController.pay(orderId);
-        assertEquals(200, secondResult.get("code"));
-        assertEquals("订单已支付，请勿重复支付", secondResult.get("msg"));
+        PaymentResult secondResult = paymentController.pay(orderId);
+        assertEquals(200, secondResult.getCode());
+        assertEquals("订单已支付，请勿重复支付", secondResult.getMsg());
         assertEquals(1L, paymentMapper.selectCount(Wrappers.emptyWrapper()), "重复支付不应新增支付记录");
     }
 
@@ -113,10 +113,10 @@ class PaymentControllerTest {
         when(orderFeignClient.getById(orderId)).thenReturn(order);
         when(orderFeignClient.updateStatus(orderId, "PAID")).thenReturn("failed");
 
-        Map<String, Object> result = paymentController.pay(orderId);
+        PaymentResult result = paymentController.pay(orderId);
 
-        assertEquals(500, result.get("code"));
-        String msg = (String) result.get("msg");
+        assertEquals(500, result.getCode());
+        String msg = result.getMsg();
         assertTrue(msg.contains("订单状态更新失败"), "失败原因应包含订单状态更新失败");
         assertEquals(0L, paymentMapper.selectCount(Wrappers.emptyWrapper()), "事务回滚后不应存在支付记录");
     }
@@ -132,10 +132,10 @@ class PaymentControllerTest {
 
         when(orderFeignClient.getById(orderId)).thenReturn(order);
 
-        Map<String, Object> result = paymentController.pay(orderId);
+        PaymentResult result = paymentController.pay(orderId);
 
-        assertEquals(400, result.get("code"));
-        assertTrue(((String) result.get("msg")).contains("订单状态异常"));
+        assertEquals(400, result.getCode());
+        assertTrue(result.getMsg().contains("订单状态异常"));
         assertEquals(0L, paymentMapper.selectCount(Wrappers.emptyWrapper()));
     }
 
@@ -147,10 +147,10 @@ class PaymentControllerTest {
         Long orderId = 4L;
         when(redisLockUtil.tryLock(anyString(), anyString(), anyLong())).thenReturn(false);
 
-        Map<String, Object> result = paymentController.pay(orderId);
+        PaymentResult result = paymentController.pay(orderId);
 
-        assertEquals(429, result.get("code"));
-        assertTrue(((String) result.get("msg")).contains("订单正在支付中"));
+        assertEquals(429, result.getCode());
+        assertTrue(result.getMsg().contains("订单正在支付中"));
         assertEquals(0L, paymentMapper.selectCount(Wrappers.emptyWrapper()), "锁失败时不应产生支付记录");
     }
 
@@ -167,9 +167,9 @@ class PaymentControllerTest {
         when(orderFeignClient.getById(orderId)).thenReturn(order);
         when(orderFeignClient.updateStatus(orderId, "PAID")).thenReturn("success");
 
-        Map<String, Object> result = paymentController.pay(orderId);
+        PaymentResult result = paymentController.pay(orderId);
 
-        assertEquals(200, result.get("code"));
+        assertEquals(200, result.getCode());
         assertEquals(1L, paymentMapper.selectCount(Wrappers.emptyWrapper()));
 
         com.gec.shop.payment.pojo.Payment payment = paymentMapper.selectList(Wrappers.emptyWrapper()).get(0);

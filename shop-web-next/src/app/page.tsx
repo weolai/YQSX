@@ -1,16 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Camera, Sparkles, ShoppingBag, Zap, ArrowRight, ListOrdered } from "lucide-react";
 import { Navbar } from "@/components/layout/navbar";
 import { Card } from "@/components/ui/card";
 import { PixelHero } from "@/components/ui/pixel-hero";
 import { TextShimmer } from "@/components/ui/shimmer-text";
-import { FloatingSnacks } from "@/components/three/floating-snacks";
 import { ScrollReveal, StaggerContainer, StaggerItem } from "@/components/design/scroll-reveal";
 import { AnimatedCounter } from "@/components/design/animated-counter";
 import { MagneticButton } from "@/components/design/magnetic-button";
+
+// Sprint 3 性能优化:three.js 组件动态导入,不进入首屏 bundle,SSR 禁用
+// 此前 FloatingSnacks 静态导入导致首屏 bundle 体积增加 ~400KB
+const FloatingSnacks = dynamic(
+  () => import("@/components/three/floating-snacks").then((m) => m.FloatingSnacks),
+  { ssr: false, loading: () => null }
+);
 
 export default function HomePage() {
   const router = useRouter();
@@ -18,28 +25,31 @@ export default function HomePage() {
   const features = [
     {
       icon: Camera,
-      title: "智能识别",
-      description: "拍照即可识别零食，精准度高达95%，支持多种零食品类同时识别。",
+      title: "拍照识别",
+      description: "上传零食照片，系统将识别图中商品，并推荐相似零食。",
+      linkText: "去识别",
       href: "/recognize",
     },
     {
       icon: Sparkles,
-      title: "DIN 推荐",
-      description: "输入用户 ID 即可返回 Top40 纯数字商品 ID，直连推荐服务。",
-      href: "/recognize",
+      title: "智能推荐",
+      description: "根据你的浏览与购买偏好，为你推荐更可能感兴趣的零食。",
+      linkText: "看推荐",
+      href: "/recommend",
     },
     {
       icon: ListOrdered,
-      title: "便捷下单",
-      description: "一键购买，快速完成订单，享受流畅的购物体验。",
+      title: "快速下单",
+      description: "查看商品详情后可直接创建订单，支付状态实时更新。",
+      linkText: "开始购买",
       href: "/orders",
     },
   ];
 
   const stats = [
-    { value: 19, suffix: "+", label: "零食品类" },
-    { value: 95, suffix: "%", label: "识别精度" },
-    { value: 3, suffix: "s", label: "秒级响应", decimals: 1 },
+    { value: 19, suffix: "+", label: "品类覆盖" },
+    { value: 95, suffix: "%", label: "识别能力" },
+    { value: 3, suffix: "s", label: "响应体验", decimals: 1 },
   ];
 
   return (
@@ -51,11 +61,11 @@ export default function HomePage() {
         <div className="relative">
           <FloatingSnacks />
           <PixelHero
-            word1="AI 智能"
-            word2="零食商城"
-            description="拍照识别零食，AI 智能推荐，一键下单，享受未来购物体验。"
-            primaryCta="开始识别"
-            secondaryCta="浏览商品"
+            word1="拍照识别零食，"
+            word2="推荐你可能爱吃的商品"
+            description="上传零食照片，系统将识别图中商品，并结合你的浏览偏好推荐相似零食。也可以直接浏览商品，快速完成下单。"
+            primaryCta="立即拍照识别"
+            secondaryCta="先逛逛商品"
             onPrimaryClick={() => router.push("/recognize")}
             onSecondaryClick={() => router.push("/products")}
           />
@@ -72,7 +82,7 @@ export default function HomePage() {
                 让零食购物更简单
               </h2>
               <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-                结合 DIN 推荐算法与智能前端展示，打造从登录、推荐到结果展示的一站式体验。
+                从图片识别、商品推荐到订单支付，YQSX 将零食购买流程整合为更高效、更直观的一站式体验。
               </p>
             </ScrollReveal>
 
@@ -91,7 +101,7 @@ export default function HomePage() {
                       <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
                       <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
                       <div className="mt-6 flex items-center text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        了解更多
+                        {feature.linkText}
                         <ArrowRight className="ml-1 h-4 w-4" />
                       </div>
                     </Card>
@@ -108,6 +118,7 @@ export default function HomePage() {
           <div className="container mx-auto max-w-5xl relative">
             <ScrollReveal>
               <Card className="p-12 glass border-border/50">
+                <p className="text-xs text-muted-foreground text-center mb-6">实验环境数据，仅供展示参考</p>
                 <div className="grid md:grid-cols-3 gap-8 text-center">
                   {stats.map((stat) => (
                     <div key={stat.label} className="space-y-2">
@@ -163,13 +174,13 @@ export default function HomePage() {
                 <div className="relative z-10">
                   <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-6">
                     <Sparkles className="mr-1.5 h-4 w-4" />
-                    AI 智能识别
+                    智能购物体验
                   </span>
                   <h2 className="text-2xl md:text-4xl font-serif font-semibold text-foreground mb-6 tracking-tight">
                     准备好发现新口味了吗？
                   </h2>
                   <p className="text-muted-foreground text-lg max-w-xl mx-auto mb-8">
-                    立即体验 DIN 推荐结果展示，让每一位用户都能看到自己的 Top40 商品 ID。
+                    上传照片或浏览商品，让系统为你推荐更合适的零食选择。
                   </p>
                   <MagneticButton
                     onClick={() => router.push("/recognize")}
@@ -190,7 +201,7 @@ export default function HomePage() {
             <p>© 2026 YQSX 智能零食商城. All rights reserved.</p>
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-primary" />
-              <span>AI 驱动 · 智能识别 · 极速下单</span>
+              <span>智能识别 · 个性化推荐 · 安心下单</span>
             </div>
           </div>
         </footer>

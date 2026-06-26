@@ -14,6 +14,7 @@ import com.gec.shop.user.util.PhoneUtil;
 import com.gec.shop.common.util.ResultBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -40,6 +42,9 @@ public class UserController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private org.springframework.core.env.Environment environment;
 
     @GetMapping("/hello")
     public Map<String, String> hello() {
@@ -115,7 +120,14 @@ public class UserController {
             }
             Map<String, String> sendResult = smsCodeService.sendCode(phone, type);
             Map<String, Object> result = ResultBuilder.success(sendResult.get("msg"));
-            result.put("verifyCode", sendResult.get("code"));
+            // 安全约束:验证码仅在 dev/test profile 通过 API 返回(演示用)
+            // prod profile 不返回 verifyCode 字段,验证码应通过真实短信通道下发
+            boolean isDevOrTest = environment != null
+                    && (Arrays.asList(environment.getActiveProfiles()).contains("dev")
+                        || Arrays.asList(environment.getActiveProfiles()).contains("test"));
+            if (isDevOrTest) {
+                result.put("verifyCode", sendResult.get("code"));
+            }
             return result;
         } catch (RuntimeException e) {
             return ResultBuilder.error(429, e.getMessage());

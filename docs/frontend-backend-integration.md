@@ -124,15 +124,14 @@ export function uploadImage(url: string, file: File, params?: Record<string, any
 
 **接口**：
 ```
-POST /user/login?username={username}&password={password}
+POST /user/login
+Content-Type: application/json
 ```
-
-> 注意：当前后端使用 `@RequestParam` 接收参数，前端需使用 query 参数或 form-data，不要使用 JSON body。
 
 **请求示例**：
 ```typescript
 const login = async (username: string, password: string) => {
-  const res = await request.post(`/user/login?username=${username}&password=${password}`);
+  const res = await request.post('/user/login', { username, password });
   if (res.data.code === 200) {
     userStore.setToken(res.data.token);
     userStore.setUserInfo({
@@ -144,6 +143,58 @@ const login = async (username: string, password: string) => {
 };
 ```
 
+### 3.1a 注册页面
+
+**页面路径**：`/login`（注册表单在登录页切换）
+
+**接口**：
+```
+POST /user/send-code
+POST /user/register
+Content-Type: application/json
+```
+
+**请求示例**：
+```typescript
+// 发送短信验证码
+const sendCode = async (phone: string) => {
+  return request.post('/user/send-code', { phone, type: 'REGISTER' });
+};
+
+// 手机号验证码注册
+const register = async (data: {
+  phone: string;
+  code: string;
+  username: string;
+  password: string;
+  nickname?: string;
+}) => {
+  return request.post('/user/register', data);
+};
+```
+
+### 3.1b 重置密码页面
+
+**页面路径**：`/login`（重置密码表单在登录页切换）
+
+**接口**：
+```
+POST /user/send-code
+POST /user/reset-password
+Content-Type: application/json
+```
+
+**请求示例**：
+```typescript
+const resetPassword = async (data: {
+  phone: string;
+  code: string;
+  newPassword: string;
+}) => {
+  return request.post('/user/reset-password', data);
+};
+```
+
 ---
 
 ### 3.2 商品列表页面
@@ -152,12 +203,21 @@ const login = async (username: string, password: string) => {
 
 **接口**：
 ```
+GET /products/list?categoryId={categoryId}
 GET /products/{pid}
 GET /products/recommend?categoryId={categoryId}&limit={limit}
+GET /products/din/topk?userId={userId}&k={k}
 ```
 
 **示例**：
 ```typescript
+// 商品列表
+const getProductList = (categoryId?: number) => {
+  return request.get('/products/list', {
+    params: categoryId ? { categoryId } : undefined
+  });
+};
+
 // 商品详情
 const getProductDetail = (pid: number) => {
   return request.get(`/products/${pid}`);
@@ -167,6 +227,13 @@ const getProductDetail = (pid: number) => {
 const getRecommendProducts = (categoryId: number, limit: number = 10) => {
   return request.get(`/products/recommend`, {
     params: { categoryId, limit }
+  });
+};
+
+// DIN 个性化推荐（后端聚合商品详情，含降级兜底）
+const getDinTopK = (userId: number, k: number = 8) => {
+  return request.get('/products/din/topk', {
+    params: { userId, k }
   });
 };
 ```
@@ -264,28 +331,18 @@ const handleRecognize = async () => {
 
 ### 3.4 订单创建页面
 
-**页面路径**：`/orders/create`
+**页面路径**：`/products`（从商品详情页点击购买创建订单）
 
 **接口**：
 ```
 POST /orders/save
-Content-Type: application/x-www-form-urlencoded
-pid: <商品ID>
-uid: <用户ID>
+Content-Type: application/json
 ```
 
 **示例**：
 ```typescript
-const createOrder = (pid: number, uid: number) => {
-  const params = new URLSearchParams();
-  params.append('pid', pid.toString());
-  params.append('uid', uid.toString());
-  
-  return request.post('/orders/save', params, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
-  });
+const createOrder = (pid: number, uid: number, number: number = 1) => {
+  return request.post('/orders/save', { pid, uid, number });
 };
 ```
 
@@ -428,9 +485,10 @@ export default router;
 - [x] 统一使用 `/api` 作为 baseURL，通过 Next.js 代理到 Gateway
 - [x] 登录后将 token 存入 Zustand 和 localStorage/Cookie
 - [x] 每次请求自动携带 `Authorization: Bearer <token>`
-- [x] 登录接口使用 JSON body，不通过 URL query 传递密码
+- [x] 登录/注册/重置密码接口使用 JSON body，不通过 URL query 传递密码
 - [x] 文件上传使用 multipart/form-data
-- [x] 订单/支付接口使用 application/x-www-form-urlencoded
+- [x] 订单创建使用 JSON body
+- [x] 支付接口使用 application/x-www-form-urlencoded
 - [x] 401 统一跳转登录页
 - [x] 429/503 提示用户稍后重试
 - [ ] 图片上传前进行大小和格式校验
@@ -438,4 +496,4 @@ export default router;
 
 ---
 
-**文档生成时间**: 2026-06-20
+**文档生成时间**: 2026-06-26

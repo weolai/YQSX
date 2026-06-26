@@ -24,9 +24,9 @@ export function PaymentFailedView({ countdown, onRetry }: PaymentFailedViewProps
       <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-destructive/10 flex items-center justify-center">
         <XCircle className="h-12 w-12 text-destructive" />
       </div>
-      <h2 className="text-2xl font-serif font-semibold mb-4 text-foreground">支付失败</h2>
+      <h2 className="text-2xl font-serif font-semibold mb-4 text-foreground">支付未完成</h2>
       <p className="text-muted-foreground mb-6">
-        {countdown === 0 ? '支付超时，请重新下单' : '支付失败，请重试'}
+        {countdown === 0 ? '支付时间已超时，请重新创建订单。' : '支付未能完成，请重新尝试或返回订单查看状态。'}
       </p>
       <div className="flex gap-4">
           <Button

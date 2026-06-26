@@ -1,4 +1,7 @@
-# 前端项目实施指南
+# 前端项目实施指南（历史 Vue 3 参考）
+
+> ⚠️ **重要提示**：本项目前端已迁移至 **Next.js 16 + React 19 + TypeScript**，目录为 `shop-web-next`，开发端口为 `3000`。
+> 本文档保留为 Vue 3 历史实现参考。如需查看当前项目实现，请直接参考 `shop-web-next/` 源码。
 
 ## 📋 总览
 
@@ -72,17 +75,17 @@ npm -v
 # 如果版本过低，请先升级 Node.js
 ```
 
-### 2.2 创建 Vue3 + TypeScript 项目
+### 2.2 创建前端项目（Vue 3 历史参考）
 
 ```bash
 # 进入项目根目录
 cd d:/Programming/YQSX
 
 # 创建 Vue 3 + TypeScript 项目（使用 Vite）
-npm create vite@latest shop-web -- --template vue-ts
+npm create vite@latest shop-web-next -- --template vue-ts
 
 # 进入项目目录
-cd shop-web
+cd shop-web-next
 
 # 安装依赖
 npm install
@@ -581,7 +584,7 @@ const handleReset = () => {
 ### 7.2 启动前端开发服务器
 
 ```bash
-cd d:/Programming/YQSX/shop-web
+cd d:/Programming/YQSX/shop-web-next
 
 # 安装依赖（首次运行）
 npm install
@@ -593,7 +596,7 @@ npm run dev
 ### 7.3 访问应用
 
 ```
-浏览器访问: http://localhost:5173
+浏览器访问: http://localhost:3000
 ```
 
 ---
@@ -609,7 +612,7 @@ npm run dev
 
 ### 8.2 测试商品详情
 
-访问: `http://localhost:5173/products/11`
+访问: `http://localhost:3000/products/11`
 
 应该看到：
 - 商品图片（Unsplash 占位图）
@@ -634,7 +637,7 @@ npm run dev
 
 1. ✅ 使用 Unsplash 占位图快速启动
 2. ✅ 优先开发 AI 识别页（核心功能）
-3. ✅ 使用 Element Plus 组件库
+3. ✅ 使用 shadcn/ui + Tailwind CSS 组件库（当前项目）；本文档代码示例使用 Element Plus（历史 Vue 3 参考）
 4. ✅ 图片加载失败兜底逻辑
 5. ✅ 充分测试识别流程
 

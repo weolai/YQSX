@@ -3,6 +3,19 @@ import { productApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/stores/auth'
 import type { RecognitionResponse } from '@/types'
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
+
+function getFileValidationError(file: File): string | null {
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return '仅支持 JPG、PNG 格式的图片'
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return '图片大小不能超过 10MB'
+  }
+  return null
+}
+
 export function useRecognition() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -37,8 +50,19 @@ export function useRecognition() {
   }
 
   const processImage = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('请上传图片文件')
+    const validationError = getFileValidationError(file)
+    if (validationError) {
+      // 释放上一个 Blob URL，防止内存泄漏
+      if (selectedImage) {
+        URL.revokeObjectURL(selectedImage)
+      }
+      setSelectedImage(null)
+      setDisplayImageSize({ width: 0, height: 0 })
+      setResult(null)
+      setHoveredIndex(null)
+      setIsLoading(false)
+      setError(validationError)
+      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
@@ -56,7 +80,11 @@ export function useRecognition() {
     try {
       const response = await productApi.recognize(file, userInfo?.userId)
       const data = response
-      setResult(data)
+      if (data.status === 'error') {
+        setError(data.message || '识别失败，请更换图片后重试')
+      } else {
+        setResult(data)
+      }
     } catch (err) {
       console.error('识别失败:', err)
       setError(err instanceof Error ? err.message : '识别服务暂时不可用，请稍后重试')
@@ -68,7 +96,12 @@ export function useRecognition() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    const file = e.dataTransfer.files[0]
+    const files = e.dataTransfer.files
+    if (files.length === 0) return
+    if (files.length > 1) {
+      setError('暂不支持同时上传多张图片，已仅处理第一张')
+    }
+    const file = files[0]
     if (file) processImage(file)
   }
 
@@ -88,6 +121,18 @@ export function useRecognition() {
         height: imageRef.current.clientHeight
       })
     }
+  }
+
+  const handleImageError = () => {
+    if (selectedImage) {
+      URL.revokeObjectURL(selectedImage)
+    }
+    setSelectedImage(null)
+    setDisplayImageSize({ width: 0, height: 0 })
+    setResult(null)
+    setHoveredIndex(null)
+    setError('图片加载失败，请重新上传')
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const clearImage = () => {
@@ -121,6 +166,7 @@ export function useRecognition() {
     handleFileChange,
     handleUploadClick,
     handleImageLoad,
+    handleImageError,
     clearImage,
     setHoveredIndex,
   }

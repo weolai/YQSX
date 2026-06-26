@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 项目一键启动脚本
-启动顺序：Zipkin -> Nacos -> Java 微服务 -> 识别服务 -> 前端
+启动顺序：Zipkin -> Nacos -> Java 微服务 -> 识别服务(可选) -> DIN推荐(可选) -> Prometheus/Grafana(可选) -> 前端
 """
 
 import os
@@ -23,6 +23,20 @@ ROOT = Path(__file__).resolve().parent
 # 基础服务
 ZIPKIN_JAR = ROOT / "XML" / "zipkin-server-2.24.3-exec.jar"
 NACOS_STARTUP = ROOT / "XML" / "nacos" / "bin" / "startup.cmd"
+
+# DIN 推荐服务
+DIN_SCRIPT = ROOT / "din_model.py"
+DIN_PORT = 8000
+
+# Prometheus / Grafana
+PROMETHEUS_DIR = ROOT / "XML" / "prometheus" / "prometheus-2.45.0.windows-amd64"
+PROMETHEUS_EXE = PROMETHEUS_DIR / "prometheus.exe"
+PROMETHEUS_PORT = 9090
+
+GRAFANA_DIR = ROOT / "XML" / "grafana" / "grafana-10.1.0"
+GRAFANA_BIN_DIR = GRAFANA_DIR / "bin"
+GRAFANA_EXE = GRAFANA_BIN_DIR / "grafana-server.exe"
+GRAFANA_PORT = 3001
 
 # Java 服务配置
 JAVA_SERVICES: List[Dict] = [
@@ -274,7 +288,7 @@ def wait_for_port(port: int, name: str, max_wait: int = 120, interval: float = 2
     return False
 
 
-def start_process(cmd: List[str], cwd: Optional[Path] = None, name: str = "") -> subprocess.Popen:
+def start_process(cmd: List[str], cwd: Optional[Path] = None, name: str = "", env: Optional[dict] = None) -> subprocess.Popen:
     """启动一个后台进程，输出重定向到日志文件，避免 PIPE 缓冲区满导致阻塞"""
     log_name = name or cmd[0]
     log(f"启动: {log_name}")
@@ -287,6 +301,8 @@ def start_process(cmd: List[str], cwd: Optional[Path] = None, name: str = "") ->
         "stderr": log_file_handle,
         "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP,
     }
+    if env is not None:
+        kwargs["env"] = env
     proc = subprocess.Popen(cmd, **kwargs)
     # 将文件句柄关联到进程，便于退出时关闭
     proc._log_file_handle = log_file_handle
@@ -374,23 +390,43 @@ def start_java_services(heap_sizes: Dict[str, str]) -> bool:
     return True
 
 
+def get_recognition_conda_env() -> str:
+    """检测可用的识别服务 conda 环境"""
+    preferred = "AIDetection-service"
+    fallback = "AIDetection"
+    try:
+        result = subprocess.run(
+            ["conda", "env", "list"],
+            capture_output=True, text=True, timeout=10
+        )
+        envs_output = result.stdout
+        if preferred in envs_output:
+            return preferred
+    except Exception as e:
+        log(f"检测 conda 环境失败: {e}")
+    return fallback
+
+
 def start_recognition() -> bool:
-    """启动 Python 识别服务"""
+    """启动 Python 识别服务（可选，失败不阻塞主流程）"""
     if is_port_open(RECOGNITION_PORT):
         log(f"识别服务已经在运行 ({RECOGNITION_PORT})")
         return True
     if not RECOGNITION_DIR.exists():
-        log(f"错误：找不到识别服务目录 {RECOGNITION_DIR}")
+        log(f"警告：找不到识别服务目录 {RECOGNITION_DIR}，跳过")
         return False
 
+    conda_env = get_recognition_conda_env()
+    log(f"使用 conda 环境: {conda_env}")
     cmd = [
-        "conda", "run", "-n", "AIDetection",
+        "conda", "run", "-n", conda_env,
         "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", str(RECOGNITION_PORT)
     ]
     start_process(cmd, cwd=RECOGNITION_DIR, name="Recognition")
     if wait_for_port(RECOGNITION_PORT, "Recognition", max_wait=120):
         log_service_memory("Recognition", RECOGNITION_PORT)
         return True
+    log("警告：识别服务启动失败，核心购物流程仍可继续")
     return False
 
 
@@ -414,17 +450,88 @@ def start_frontend() -> bool:
         log("错误：找不到 npm 命令，请确认 Node.js 已安装并加入 PATH")
         return False
 
+    # Windows 下 npm 是 .cmd 脚本，直接作为可执行文件启动会报 Win32 错误，
+    # 因此通过 cmd.exe /c 调用。
     # 检测是否已有生产构建产物，有则直接生产模式启动，无则回退开发模式
     if has_production_build(FRONTEND_DIR):
         log("检测到已有生产构建产物，使用生产模式启动（内存更低、首屏更快）")
-        start_process([npm_cmd, "run", "start"], cwd=FRONTEND_DIR, name="Frontend")
+        start_process(["cmd", "/c", npm_cmd, "run", "start"], cwd=FRONTEND_DIR, name="Frontend")
     else:
         log("未检测到生产构建产物，使用开发模式启动（如需生产模式请先执行 npm run build）")
-        start_process([npm_cmd, "run", "dev"], cwd=FRONTEND_DIR, name="Frontend")
+        start_process(["cmd", "/c", npm_cmd, "run", "dev"], cwd=FRONTEND_DIR, name="Frontend")
 
     if wait_for_port(FRONTEND_PORT, "Frontend", max_wait=60):
         log_service_memory("Frontend", FRONTEND_PORT)
         return True
+    return False
+
+
+def start_din_service() -> bool:
+    """启动 DIN 推荐服务（可选）"""
+    if is_port_open(DIN_PORT):
+        log(f"DIN 推荐服务已经在运行 ({DIN_PORT})")
+        return True
+    if not DIN_SCRIPT.exists():
+        log(f"警告：找不到 DIN 推荐服务脚本 {DIN_SCRIPT}，跳过")
+        return False
+
+    # 尝试使用项目根目录的 .venv
+    venv_python = ROOT / ".venv" / "Scripts" / "python.exe"
+    if venv_python.exists():
+        python_cmd = str(venv_python)
+    else:
+        python_cmd = "python"
+
+    start_process([python_cmd, str(DIN_SCRIPT), "--mode", "serve"], cwd=ROOT, name="DIN-Recommend")
+    if wait_for_port(DIN_PORT, "DIN-Recommend", max_wait=60):
+        log_service_memory("DIN-Recommend", DIN_PORT)
+        return True
+    log("警告：DIN 推荐服务启动失败")
+    return False
+
+
+def start_prometheus() -> bool:
+    """启动 Prometheus（可选）"""
+    if is_port_open(PROMETHEUS_PORT):
+        log(f"Prometheus 已经在运行 ({PROMETHEUS_PORT})")
+        return True
+    if not PROMETHEUS_EXE.exists():
+        log(f"警告：找不到 Prometheus {PROMETHEUS_EXE}，跳过")
+        return False
+
+    start_process(
+        [str(PROMETHEUS_EXE), "--config.file=prometheus.yml", "--web.enable-lifecycle"],
+        cwd=PROMETHEUS_DIR,
+        name="Prometheus"
+    )
+    if wait_for_port(PROMETHEUS_PORT, "Prometheus", max_wait=60):
+        return True
+    log("警告：Prometheus 启动失败")
+    return False
+
+
+def start_grafana() -> bool:
+    """启动 Grafana（可选，端口固定为 3001 避免与前端冲突）"""
+    if is_port_open(GRAFANA_PORT):
+        log(f"Grafana 已经在运行 ({GRAFANA_PORT})")
+        return True
+    if not GRAFANA_EXE.exists():
+        log(f"警告：找不到 Grafana {GRAFANA_EXE}，跳过")
+        return False
+
+    # 通过环境变量强制 Grafana 监听 3001，避免与前端 Next.js 默认 3000 冲突
+    env = os.environ.copy()
+    env["GF_SERVER_HTTP_PORT"] = str(GRAFANA_PORT)
+    log(f"启动 Grafana，端口固定为 {GRAFANA_PORT}")
+    start_process(
+        [str(GRAFANA_EXE), "-homepath", str(GRAFANA_DIR)],
+        cwd=GRAFANA_BIN_DIR,
+        name="Grafana",
+        env=env
+    )
+    if wait_for_port(GRAFANA_PORT, "Grafana", max_wait=60):
+        return True
+    log("警告：Grafana 启动失败")
     return False
 
 
@@ -512,21 +619,24 @@ def main():
             show_error("启动失败", msg)
             return 1
 
-        # 4. 识别服务
-        if not start_recognition():
-            msg = "Python 识别服务启动失败，请检查：\n1. Conda 环境 AIDetection 是否存在\n2. 依赖是否已安装\n3. 端口 8086 是否被占用"
-            log(msg.replace("\n", " "))
-            show_error("启动失败", msg)
-            return 1
+        # 4. 识别服务（可选，失败不阻塞）
+        start_recognition()
 
-        # 5. 前端
+        # 5. DIN 推荐服务（可选，失败不阻塞）
+        start_din_service()
+
+        # 6. Prometheus + Grafana（可选，失败不阻塞）
+        start_prometheus()
+        start_grafana()
+
+        # 7. 前端
         if not start_frontend():
             msg = "前端启动失败，请检查：\n1. Node.js 是否安装\n2. 是否已执行 npm install\n3. 端口 3000 是否被占用"
             log(msg.replace("\n", " "))
             show_error("启动失败", msg)
             return 1
 
-        # 6. 打开浏览器
+        # 8. 打开浏览器
         open_browser()
 
         log("=" * 50)

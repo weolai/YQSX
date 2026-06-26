@@ -100,7 +100,7 @@ export function RegisterForm({
             {countdown > 0 ? `${countdown}s 后重发` : "获取验证码"}
           </Button>
         </div>
-        <p className="text-xs text-white/60">演示环境验证码将输出在后端控制台</p>
+
       </div>
 
       <div className="space-y-2">
@@ -137,7 +137,7 @@ export function RegisterForm({
       <PasswordInput
         label="密码"
         labelClassName="text-white flex items-center gap-2"
-        placeholder="请输入密码（至少 6 位）"
+        placeholder="请输入至少 6 位密码"
         value={regPassword}
         onChange={(e) => onRegPasswordChange(e.target.value)}
         autoComplete="new-password"
@@ -185,7 +185,7 @@ export function RegisterForm({
         {displayLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            处理中...
+            正在注册...
           </>
         ) : (
           "注册"

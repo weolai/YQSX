@@ -1,0 +1,104 @@
+# ==================== IDE / Editor ====================
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.project
+.classpath
+.settings/
+
+# ==================== Build output ====================
+target/
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# ==================== Logs ====================
+logs/
+*.log
+*.err
+*.lck
+*.idx
+
+# ==================== Middleware / Runtime binaries ====================
+XML/
+nacos.home_IS_UNDEFINED/
+*.jar
+*.zip
+*.exe
+*.pdb
+*.dll
+
+# ==================== Runtime data / Screenshots / Temp ====================
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+nacos-*.png
+sentinel-*.png
+zipkin-*.png
+/*.json
+order-*.json
+pay-*.json
+zipkin-*.json
+tmp_*.json
+tmp_*.txt
+/*.txt
+order-deps.txt
+powershell问题.md
+test_image.jpg
+
+# ==================== Courseware ====================
+课件/
+
+# ==================== OS generated ====================
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# ==================== Local env ====================
+.env.local
+.env.*.local
+
+# ==================== IDE / AI workspace cache ====================
+.trae/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ==================== Temporary / debug scripts ====================
+tmp-*.mjs
+tmp_test_*.py
+login.json
+tmp_login.json
+final_verify.py
+restart_both.py
+restart_recog.py
+
+# ==================== DIN model data / cache ====================
+DIN/cache/
+DIN/recommend/
+DIN/*.weights.h5
+DIN/*.h5
+
+# ==================== Credential / password SQL ====================
+update_admin_password.sql
+
+# ==================== Windows reserved device names ====================
+nul
+NUL
+con
+CON
+aux
+AUX
+prn
+PRN
+

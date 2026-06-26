@@ -3,10 +3,12 @@ package com.gec.shop.order.service.impl;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.gec.shop.order.mapper.OrderMapper;
+import com.gec.shop.order.pojo.CompensateLog;
 import com.gec.shop.order.pojo.Order;
 import com.gec.shop.order.feign.IProductFeignService;
 import com.gec.shop.order.feign.IUserFeignService;
 import com.gec.shop.order.pojo.User;
+import com.gec.shop.order.service.CompensateLogInternalService;
 import com.gec.shop.order.service.OrderService;
 import com.gec.shop.product.pojo.Product;
 import java.time.LocalDateTime;
@@ -24,7 +26,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 订单服务实现类
- * 通过OpenFeign调用商品服务获取商品信息，便于Sleuth链路追踪
+ *
+ * Sprint 2 重构:
+ * - createOrder 移除 @Transactional,拆分为两阶段避免长事务
+ *   阶段1: Feign 扣库存(product 服务内部事务)
+ *   阶段2: 本地事务落订单 + 写补偿日志
+ *   阶段2 失败: 写 t_compensate_log(STOCK_ROLLBACK),立即尝试回滚,失败由定时任务重试
  */
 @Slf4j
 @Service
@@ -39,6 +46,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     @Autowired
     private MeterRegistry meterRegistry;
 
+    @Autowired
+    private CompensateLogInternalService compensateLogInternalService;
+
     private Counter orderCreateCounter;
 
     @Autowired
@@ -49,17 +59,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
 
     /**
-     * 创建订单：编排参数校验、商品/用户信息获取、库存扣减、订单持久化与补偿回滚。
-     * 事务边界覆盖本方法，子方法仅承担单一职责，保持主流程清晰可读。
+     * 创建订单(无 @Transactional,拆分为两阶段)
+     *
+     * 阶段1: Feign 扣库存(事务外,product 服务内部事务已提交)
+     * 阶段2: 本地事务落订单 + 写补偿日志
+     *
+     * 一致性保障:
+     * - 阶段2 失败时,库存已扣减但订单未落库,写 t_compensate_log 待补偿
+     * - 立即尝试回滚库存,失败则由 StockRollbackCompensateTask 定时重试
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public Order createOrder(Long pid, Long uid, Integer number) {
         validateCreateRequest(number);
         Product product = fetchAndValidateProduct(pid, number);
         String username = resolveUsername(uid);
+        // 阶段1: 扣库存(Feign,事务外)
         reduceStockOrThrow(pid, number);
-        return buildAndSaveOrderWithCompensation(pid, uid, number, product, username);
+        // 阶段2: 本地事务落订单
+        return saveOrderWithCompensation(pid, uid, number, product, username);
     }
 
     /**
@@ -112,21 +129,82 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
 
     /**
-     * 构建并保存订单，失败时补偿回滚库存
+     * 本地事务落订单 + 写补偿日志
+     *
+     * 事务策略:
+     * - saveOrderInTransaction: REQUIRED (落订单)
+     * - 若落订单失败,写 t_compensate_log(STOCK_ROLLBACK) + 立即尝试回滚库存
+     * - 立即回滚失败时,补偿日志由定时任务重试
      */
-    private Order buildAndSaveOrderWithCompensation(Long pid, Long uid, Integer number,
-                                                     Product product, String username) {
+    private Order saveOrderWithCompensation(Long pid, Long uid, Integer number,
+                                              Product product, String username) {
         Order order = buildOrder(pid, uid, number, product, username);
         try {
-            log.info("创建订单: uid={}, pid={}, number={}, orderNo={}", uid, pid, number, order.getOrderNo());
-            super.save(order);
+            saveOrderInTransaction(order);
             orderCreateCounter.increment();
+            log.info("创建订单成功: uid={}, pid={}, number={}, orderNo={}", uid, pid, number, order.getOrderNo());
+            return order;
         } catch (Exception e) {
-            log.error("订单创建失败，补偿回滚库存: pid={}, number={}", pid, number, e);
-            compensateRollbackStock(pid, number);
+            log.error("订单落库失败,启动补偿: pid={}, number={}", pid, number, e);
+            handleOrderSaveFailure(pid, number, order, e);
             throw e;
         }
-        return order;
+    }
+
+    /**
+     * 本地事务落订单(REQUIRED)
+     * 仅覆盖订单落库,不包含 Feign 调用,避免长事务
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void saveOrderInTransaction(Order order) {
+        log.info("生成订单号: uid={}, pid={}, generatedOrderNo={}", order.getUid(), order.getPid(), order.getOrderNo());
+        super.save(order);
+    }
+
+    /**
+     * 订单落库失败处理:
+     * 1. 写 t_compensate_log(STOCK_ROLLBACK, PENDING) - 保证有补偿记录
+     * 2. 立即尝试回滚库存 - 快速恢复
+     * 3. 立即回滚失败时,依赖定时任务重试补偿日志
+     */
+    private void handleOrderSaveFailure(Long pid, Integer number, Order order, Exception cause) {
+        // 1. 写补偿日志(独立事务,保证即使外层异常也能写入)
+        CompensateLog compensateLog = buildStockRollbackLog(pid, number, order);
+        try {
+            compensateLogInternalService.saveCompensateLog(compensateLog);
+            log.info("已写入补偿日志: bizType=STOCK_ROLLBACK, pid={}, number={}", pid, number);
+        } catch (Exception logEx) {
+            log.error("补偿日志写入失败,需人工介入: pid={}, number={}", pid, number, logEx);
+        }
+        // 2. 立即尝试回滚库存
+        try {
+            boolean rollbackOk = productFeignService.rollbackStock(pid, number);
+            if (rollbackOk) {
+                // 回滚成功,更新补偿日志为 SUCCESS
+                compensateLogInternalService.markCompensateSuccess(compensateLog.getId());
+                log.info("库存立即回滚成功: pid={}, number={}", pid, number);
+            } else {
+                log.warn("库存立即回滚返回 false,将由定时任务重试: pid={}, number={}", pid, number);
+            }
+        } catch (Exception rollbackEx) {
+            // 立即回滚失败,补偿日志保持 PENDING,由定时任务重试
+            log.error("库存立即回滚失败,等待定时任务重试: pid={}, number={}", pid, number, rollbackEx);
+        }
+    }
+
+    /**
+     * 构建库存回滚补偿日志
+     */
+    private CompensateLog buildStockRollbackLog(Long pid, Integer number, Order order) {
+        CompensateLog entity = new CompensateLog();
+        entity.setBizType("STOCK_ROLLBACK");
+        entity.setBizId(String.valueOf(pid));
+        entity.setOrderId(order.getId());
+        entity.setPayload("{\"pid\":" + pid + ",\"number\":" + number + "}");
+        entity.setStatus("PENDING");
+        entity.setRetryCount(0);
+        entity.setMaxRetry(3);
+        return entity;
     }
 
     /**
@@ -135,7 +213,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private Order buildOrder(Long pid, Long uid, Integer number, Product product, String username) {
         Order order = new Order();
         String generatedOrderNo = generateOrderNo();
-        log.info("生成订单号: uid={}, pid={}, generatedOrderNo={}", uid, pid, generatedOrderNo);
         order.setOrderNo(generatedOrderNo);
         order.setPid(pid);
         order.setProductName(product.getName());
@@ -148,32 +225,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setCreateTime(LocalDateTime.now());
         order.setUpdateTime(LocalDateTime.now());
         return order;
-    }
-
-    /**
-     * 补偿回滚库存（订单创建失败时调用），回滚失败仅记录日志需人工补偿
-     */
-    private void compensateRollbackStock(Long pid, Integer number) {
-        try {
-            productFeignService.rollbackStock(pid, number);
-        } catch (Exception rollbackEx) {
-            log.error("库存回滚失败，需人工补偿: pid={}, number={}", pid, number, rollbackEx);
-        }
-    }
-
-    /**
-     * 刷新订单中的商品名称，保持与商品库一致
-     * Feign 调用失败时仅记录日志，不影响订单查询
-     */
-    private void refreshProductName(Order order) {
-        try {
-            Product product = productFeignService.get(order.getPid());
-            if (product != null && product.getName() != null) {
-                order.setProductName(product.getName());
-            }
-        } catch (Exception e) {
-            log.warn("刷新商品名称失败, orderId={}, pid={}", order.getId(), order.getPid(), e);
-        }
     }
 
     @Override
@@ -230,6 +281,21 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
     }
 
+    /**
+     * 刷新订单中的商品名称，保持与商品库一致
+     * Feign 调用失败时仅记录日志，不影响订单查询
+     */
+    private void refreshProductName(Order order) {
+        try {
+            Product product = productFeignService.get(order.getPid());
+            if (product != null && product.getName() != null) {
+                order.setProductName(product.getName());
+            }
+        } catch (Exception e) {
+            log.warn("刷新商品名称失败, orderId={}, pid={}", order.getId(), order.getPid(), e);
+        }
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int updateStatus(Long id, String status) {
@@ -247,14 +313,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             throw new RuntimeException("非法状态转换: " + current + " -> " + status);
         }
         // CAS 更新：WHERE id=? AND status=? 防止并发竞态
-        // 即使两个线程同时读到 WAIT_PAY，只有一个能更新成功
         LambdaUpdateWrapper<Order> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(Order::getId, id)
                .eq(Order::getStatus, current)
                .set(Order::getStatus, status);
         int rows = super.baseMapper.update(null, wrapper);
         if (rows == 0) {
-            // 版本冲突：状态已被其他线程修改
             log.warn("订单状态CAS更新失败(并发冲突): id={}, expected={}, actual={}",
                     id, current, super.getById(id).getStatus());
             return 0;
@@ -278,7 +342,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     /**
      * 生成订单号：yyyyMMddHHmmss + 6位随机数，共20位
-     * 同一秒内并发冲突概率极低，数据库唯一索引兜底
      */
     private String generateOrderNo() {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));

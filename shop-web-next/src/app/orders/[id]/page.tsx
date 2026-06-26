@@ -16,24 +16,32 @@ import { ErrorState } from '@/components/async-state/error-state'
 import { EmptyState } from '@/components/async-state/empty-state'
 import { OrderStatusBadge } from '@/components/orders/order-status-badge'
 import { orderApi } from '@/lib/api'
-import type { Order } from '@/types'
+import { OrderStatus, type Order } from '@/types'
 
-const statusMessage: Record<string, { title: string; desc: string }> = {
-  WAIT_PAY: {
+const statusMessage: Record<OrderStatus, { title: string; desc: string }> = {
+  [OrderStatus.WAIT_PAY]: {
     title: '订单待支付',
-    desc: '请在 30 分钟内完成支付，超时订单将自动取消',
+    desc: '请在规定时间内完成支付，超时后订单可能自动取消。',
   },
-  PAID: {
+  [OrderStatus.PAID]: {
     title: '订单已支付',
-    desc: '商家正在准备发货，请耐心等待',
+    desc: '支付已确认，商家正在准备处理订单。',
   },
-  FINISHED: {
+  [OrderStatus.FINISHED]: {
     title: '订单已完成',
-    desc: '感谢你的购买，期待再次光临',
+    desc: '感谢你的购买，期待再次为你推荐喜欢的零食。',
   },
-  CANCELED: {
+  [OrderStatus.CANCELED]: {
     title: '订单已取消',
-    desc: '该订单已被取消，如有疑问请联系客服',
+    desc: '该订单已取消，如有疑问请联系平台客服。',
+  },
+  [OrderStatus.DUPLICATE]: {
+    title: '订单待支付',
+    desc: '该订单已存在，请继续完成支付。',
+  },
+  [OrderStatus.BLOCKED]: {
+    title: '订单处理中',
+    desc: '订单正在处理中，请稍后查看状态。',
   },
 }
 
@@ -49,17 +57,29 @@ export default function OrderDetailPage() {
   // 加载订单（带 AbortController 防 Race Condition）
   useEffect(() => {
     const controller = new AbortController()
+    console.log('[order-detail] 开始加载订单详情', { orderId })
     const loadOrder = async () => {
       try {
         setIsLoading(true)
         setLoadError(null)
         const result = await orderApi.getById(orderId)
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted) {
+          console.log('[order-detail] 加载订单详情请求已取消', { orderId })
+          return
+        }
+        console.log('[order-detail] 订单详情加载成功', {
+          orderId: result.id,
+          status: result.status,
+          productName: result.productName,
+          productPrice: result.productPrice,
+          number: result.number,
+          totalAmount: result.productPrice * result.number,
+        })
         setOrder(result)
       } catch (error) {
         if (!controller.signal.aborted) {
-          console.error('加载订单失败:', error)
-          setLoadError('加载订单失败，请刷新重试')
+          console.error('[order-detail] 加载订单详情失败:', error)
+          setLoadError('订单加载失败，请刷新后重试。')
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -71,7 +91,20 @@ export default function OrderDetailPage() {
     return () => controller.abort()
   }, [orderId])
 
+  // 监听订单状态变化，输出支付按钮等关键 UI 状态
+  useEffect(() => {
+    if (!order) return
+    const showPayButton = order.status === OrderStatus.WAIT_PAY
+    console.log('[order-detail] 订单状态变化', {
+      orderId: order.id,
+      status: order.status,
+      showPayButton,
+      paymentLink: showPayButton ? `/payment/${order.id}` : null,
+    })
+  }, [order])
+
   const handlePayment = useCallback(() => {
+    console.log('[order-detail] 用户点击支付按钮，跳转支付页', { orderId })
     router.push(`/payment/${orderId}`)
   }, [router, orderId])
 
@@ -113,7 +146,7 @@ export default function OrderDetailPage() {
         <main className="container mx-auto px-4 py-12 sm:py-16">
           <EmptyState
             icon={<Package className="h-10 w-10 text-primary/60" />}
-            title="订单不存在"
+            title="订单不存在或已被删除。"
             action={
               <Button
                 onClick={() => router.push('/orders')}
@@ -197,8 +230,8 @@ export default function OrderDetailPage() {
                     <div className="flex items-start justify-between gap-4 mb-6">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-lg mb-2 text-foreground line-clamp-2">{order.productName}</h3>
-                        <p className="text-sm text-muted-foreground">数量: {order.number} 件</p>
-                        <p className="text-sm text-muted-foreground">单价: ¥{order.productPrice.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">数量：{order.number} 件</p>
+                        <p className="text-sm text-muted-foreground">单价：¥{order.productPrice.toFixed(2)}</p>
                       </div>
                       <div className="w-20 h-20 bg-background rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
                         <Package className="h-10 w-10 text-primary/40" />
@@ -214,7 +247,7 @@ export default function OrderDetailPage() {
                 </div>
 
                 {/* 支付按钮 */}
-                {order.status === 'WAIT_PAY' && (
+                {order.status === OrderStatus.WAIT_PAY && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}

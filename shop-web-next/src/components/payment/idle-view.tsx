@@ -44,7 +44,7 @@ export function PaymentIdleView({
                 <Package className="h-6 w-6 text-primary" />
               </div>
               <div className="text-left">
-                <p className="text-sm text-muted-foreground">订单编号: #{order.id}</p>
+                <p className="text-sm text-muted-foreground">订单编号：#{order.id}</p>
                 <p className="font-medium text-foreground line-clamp-1">{order.productName} x {order.number}</p>
               </div>
             </div>
@@ -78,7 +78,7 @@ export function PaymentIdleView({
       </MagneticButton>
 
       <p className="mt-4 text-xs text-muted-foreground">
-        点击确认支付即表示你同意相关服务协议
+        点击确认支付即表示你确认订单信息并继续完成支付。
       </p>
     </motion.div>
   )

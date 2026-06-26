@@ -4,7 +4,6 @@ import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.gec.shop.order.dto.OrderCreateDTO;
 import com.gec.shop.order.pojo.Order;
-import com.gec.shop.order.config.TraceConfig;
 import com.gec.shop.order.service.OrderService;
 import com.gec.shop.common.util.RedisLockUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,16 +28,15 @@ public class OrderController {
     @Autowired
     private RedisLockUtil redisLockUtil;
 
-    @Autowired
-    private TraceConfig traceConfig;
-
     @PostMapping("/save")
     @SentinelResource(value = "order.create", blockHandler = "createOrderBlockHandler")
     public Order order(@RequestBody OrderCreateDTO dto) {
         String lockKey = "order:dedup:" + dto.getUid() + ":" + dto.getPid();
         String lockValue = Thread.currentThread().getId() + "-" + System.nanoTime();
 
-        boolean locked = redisLockUtil.tryLock(lockKey, lockValue, 10);
+        // Sprint 2: 锁 TTL 从 10s 提升至 60s,覆盖 Feign 链路(product/user 调用)
+        // 不引入看门狗续期,60s 足够覆盖正常业务流程
+        boolean locked = redisLockUtil.tryLock(lockKey, lockValue, 60);
         if (!locked) {
             Order order = new Order();
             order.setId(-1L);
@@ -50,11 +48,10 @@ public class OrderController {
         }
 
         try {
-            if (!traceConfig.isFullChain()) {
-                Order existOrder = orderService.findPendingOrder(dto.getUid(), dto.getPid());
-                if (existOrder != null) {
-                    return existOrder;
-                }
+            // 幂等检查始终启用(Sprint 2: 移除 full-chain 跳过逻辑)
+            Order existOrder = orderService.findPendingOrder(dto.getUid(), dto.getPid());
+            if (existOrder != null) {
+                return existOrder;
             }
             return orderService.createOrder(dto.getPid(), dto.getUid(), dto.getNumber());
         } finally {

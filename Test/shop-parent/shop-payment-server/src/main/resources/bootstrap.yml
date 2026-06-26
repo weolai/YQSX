@@ -9,3 +9,5 @@ spring:
         shared-configs:
           - data-id: global-config.yaml
             refresh: true
+      discovery:
+        server-addr: localhost:8848

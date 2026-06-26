@@ -1,22 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
 import { Navbar } from '@/components/layout/navbar'
 import { Card } from '@/components/ui/card'
-import { Camera, ScanLine, Sparkles } from 'lucide-react'
+import { Camera, ScanLine } from 'lucide-react'
 import { TextShimmer } from '@/components/ui/shimmer-text'
 import { ScrollReveal } from '@/components/design/scroll-reveal'
 import { ImageUploader } from '@/components/recognize/image-uploader'
 import { RecognitionResultPanel } from '@/components/recognize/result-panel'
 import { useRecognition } from '@/hooks/use-recognition'
-import { useAuthStore } from '@/lib/stores/auth'
-import { productApi } from '@/lib/api'
 
 export default function RecognizePage() {
-  const { userInfo } = useAuthStore()
-  const [recommendList, setRecommendList] = useState<number[]>([])
-  const [recommendLoading, setRecommendLoading] = useState(false)
-  const [recommendError, setRecommendError] = useState<string | null>(null)
   const {
     selectedImage,
     displayImageSize,
@@ -34,46 +27,10 @@ export default function RecognizePage() {
     handleFileChange,
     handleUploadClick,
     handleImageLoad,
+    handleImageError,
     clearImage,
     setHoveredIndex,
   } = useRecognition()
-
-  useEffect(() => {
-    let cancelled = false
-
-    const loadRecommendations = async () => {
-      if (!userInfo?.userId) {
-        setRecommendList([])
-        return
-      }
-
-      setRecommendLoading(true)
-      setRecommendError(null)
-      try {
-        const response = await productApi.getDinRecommendations(userInfo.userId, 40)
-        if (!cancelled) {
-          setRecommendList(response.data?.recommendList ?? [])
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setRecommendError(error instanceof Error ? error.message : '推荐服务暂时不可用')
-          setRecommendList([])
-        }
-      } finally {
-        if (!cancelled) {
-          setRecommendLoading(false)
-        }
-      }
-    }
-
-    loadRecommendations()
-
-    return () => {
-      cancelled = true
-    }
-  }, [userInfo?.userId])
-
-  const recommendPreview = useMemo(() => recommendList.slice(0, 10), [recommendList])
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,7 +45,7 @@ export default function RecognizePage() {
             拍照识别零食
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            上传一张照片，AI  instantly 识别图中的零食，并为你推荐相似美味
+            上传零食照片，系统将识别图中商品，并推荐相似零食。识别结果可能受图片清晰度、拍摄角度和光线影响，请以商品详情为准。
           </p>
         </ScrollReveal>
 
@@ -104,6 +61,7 @@ export default function RecognizePage() {
               <ImageUploader
                 selectedImage={selectedImage}
                 isDragging={isDragging}
+                error={error}
                 fileInputRef={fileInputRef}
                 imageRef={imageRef}
                 containerRef={containerRef}
@@ -117,6 +75,7 @@ export default function RecognizePage() {
                 onUploadClick={handleUploadClick}
                 onClearImage={clearImage}
                 onImageLoad={handleImageLoad}
+                onImageError={handleImageError}
                 onHover={setHoveredIndex}
               />
             </Card>
@@ -139,45 +98,6 @@ export default function RecognizePage() {
             </Card>
           </ScrollReveal>
         </div>
-
-        <ScrollReveal delay={0.3} className="mt-8">
-          <Card className="p-6 glass border-border/50 rounded-2xl">
-            <div className="flex items-center justify-between gap-4 mb-6">
-              <div>
-                <h2 className="text-lg font-semibold flex items-center">
-                  <Sparkles className="mr-2 h-5 w-5 text-primary" />
-                  DIN 推荐商品 ID
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">基于当前登录用户的历史行为生成 Top40 纯数字商品 ID。</p>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {recommendLoading ? '加载中' : `${recommendList.length} 条推荐`}
-              </div>
-            </div>
-
-            {recommendError ? (
-              <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                {recommendError}
-              </div>
-            ) : recommendPreview.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {recommendPreview.map((itemId, index) => (
-                  <div
-                    key={`${itemId}-${index}`}
-                    className="rounded-xl border border-border/60 bg-background/60 px-4 py-3 flex items-center justify-between"
-                  >
-                    <span className="text-xs text-muted-foreground">#{index + 1}</span>
-                    <span className="font-mono text-sm font-medium tracking-wide">{itemId}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-6 py-10 text-center text-sm text-muted-foreground">
-                当前暂无推荐数据，请先完成登录并确保算法服务可访问。
-              </div>
-            )}
-          </Card>
-        </ScrollReveal>
       </main>
     </div>
   )

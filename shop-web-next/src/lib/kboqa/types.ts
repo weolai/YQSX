@@ -28,7 +28,7 @@ export interface ChatMessage {
 
 /** 商品推荐项 */
 export interface ProductRecommendation {
-  id: string;
+  id: number;
   name: string;
   category: string;
   price: number;

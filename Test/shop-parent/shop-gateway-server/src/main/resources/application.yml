@@ -36,6 +36,12 @@ spring:
             - Path=/api/payment/**
           filters:
             - StripPrefix=1
+        - id: shop-kg-service
+          uri: http://127.0.0.1:5000
+          predicates:
+            - Path=/api/kg/**
+          filters:
+            - RewritePath=/api/kg/(?<segment>.*), /$\{segment}
         - id: time-demo
           uri: lb://shop-user-service
           predicates:

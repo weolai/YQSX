@@ -66,7 +66,10 @@ instance.interceptors.response.use(
             break
           }
           const data = error.response?.data as { msg?: string; message?: string } | undefined
-          const errorMsg = data?.msg || data?.message || '请求失败'
+          // 优先使用后端返回的业务错误信息；缺失时打印 status+url 便于定位（如代理返回 HTML）
+          const reqUrl = error.config?.url ?? ''
+          const fallbackMsg = `请求失败 [${status}] ${reqUrl}`.trim()
+          const errorMsg = data?.msg || data?.message || fallbackMsg
           console.error(errorMsg)
       }
     }

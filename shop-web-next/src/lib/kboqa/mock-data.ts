@@ -1,5 +1,3 @@
-import type { ProductRecommendation } from "./types";
-
 /**
  * 样本问答数据
  * 来源：ChineseEcomQA(1).jsonl
@@ -46,33 +44,5 @@ export const BRAND_SAMPLES: EcomSample[] = [
     prompt: "中国黄金有哪些产品？",
     gt: "中国黄金提供9999足金元宝投资金条，重量范围从2克到100克不等。",
     task: "BC",
-  },
-];
-
-/** Mock 商品推荐数据 */
-export const MOCK_RECOMMENDATIONS: ProductRecommendation[] = [
-  {
-    id: "p001",
-    name: "MANN FILTER/曼牌滤清器 W712/83M",
-    category: "机油滤芯",
-    price: 89.9,
-    link: "/products/p001",
-    reason: "与查询品类高度匹配",
-  },
-  {
-    id: "p002",
-    name: "Bosch/博世 机油滤清器 0986452046",
-    category: "机油滤芯",
-    price: 65.0,
-    link: "/products/p002",
-    reason: "同品类热销商品",
-  },
-  {
-    id: "p003",
-    name: "Mahle/马勒 机油滤芯 OC205",
-    category: "机油滤芯",
-    price: 72.5,
-    link: "/products/p003",
-    reason: "同品类高性价比",
   },
 ];

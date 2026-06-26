@@ -1,13 +1,14 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { Upload, ImageIcon, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Upload, ImageIcon, X, AlertCircle } from 'lucide-react'
 import { DetectionOverlay } from './detection-overlay'
 import type { RecognitionResponse } from '@/types'
 
 interface ImageUploaderProps {
   selectedImage: string | null
   isDragging: boolean
+  error: string | null
   fileInputRef: React.RefObject<HTMLInputElement | null>
   imageRef: React.RefObject<HTMLImageElement | null>
   containerRef: React.RefObject<HTMLDivElement | null>
@@ -21,12 +22,14 @@ interface ImageUploaderProps {
   onUploadClick: () => void
   onClearImage: () => void
   onImageLoad: () => void
+  onImageError: () => void
   onHover: (index: number | null) => void
 }
 
 export function ImageUploader({
   selectedImage,
   isDragging,
+  error,
   fileInputRef,
   imageRef,
   containerRef,
@@ -40,6 +43,7 @@ export function ImageUploader({
   onUploadClick,
   onClearImage,
   onImageLoad,
+  onImageError,
   onHover
 }: ImageUploaderProps) {
   return (
@@ -47,7 +51,7 @@ export function ImageUploader({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/jpg"
         onChange={onFileChange}
         className="hidden"
       />
@@ -62,6 +66,7 @@ export function ImageUploader({
             alt="待识别图片"
             className="w-full rounded-xl object-contain max-h-[480px]"
             onLoad={onImageLoad}
+            onError={onImageError}
           />
           {result?.detections && (
             <DetectionOverlay
@@ -100,14 +105,28 @@ export function ImageUploader({
             <Upload className="h-8 w-8 text-primary" />
           </div>
           <p className="text-foreground font-medium mb-2">点击或拖拽上传图片</p>
-          <p className="text-sm text-muted-foreground">支持 JPG、PNG 格式</p>
+          <p className="text-sm text-muted-foreground">支持 JPG、PNG 格式，也可以直接拍照上传。</p>
         </motion.div>
       )}
+
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2 text-sm text-destructive"
+          >
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>{error}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {!selectedImage && (
         <div className="mt-6 flex items-center justify-center gap-3 text-sm text-muted-foreground">
           <ImageIcon className="h-4 w-4" />
-          <span>也可以直接拍照上传</span>
+          <span>支持拍照上传与本地图片选择</span>
         </div>
       )}
     </>
